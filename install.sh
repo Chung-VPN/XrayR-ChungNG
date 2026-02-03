@@ -1,9 +1,6 @@
 #!/bin/bash
 #============================================================
-#   XrayR One-Click Install — V2Board
-#   Cách dùng:
-#     bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install.sh)
-#============================================================
+#   XrayR Auto Install — V2Board
 
 red='\033[0;31m'
 green='\033[0;32m'
@@ -20,15 +17,10 @@ XRAYR_CFG="/etc/XrayR/config.yml"
 XRAYR_SVC="/etc/systemd/system/XrayR.service"
 XRAYR_RELEASE_SH="https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/XrayR.sh"
 
-# ── QUAN TRỌNG ──────────────────────────────────────────
-# Sau khi fork repo về GitHub của bạn, thay 2 giá trị dưới đây
-# bằng username và repo thật của bạn.
-# config.yml trong repo đó chứa API URL + API Key của panel (đã set sẵn).
-CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG/config.yml"
 
-#============================================================
-#  UTILITY
-#============================================================
+CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG@main/config.yml"
+
+
 check_root() {
     [[ $EUID -ne 0 ]] && echo -e "${red}Cần chạy bằng root!  →  sudo bash install.sh${plain}" && exit 1
 }
@@ -73,9 +65,7 @@ header() {
     echo ""
 }
 
-#============================================================
-#  INSTALL DEPENDENCIES
-#============================================================
+
 install_deps() {
     echo -e "${blue}[*] Cài dependencies...${plain}"
     case "$release" in
@@ -88,9 +78,7 @@ install_deps() {
     echo -e "${green}[✓] OK${plain}"
 }
 
-#============================================================
-#  DOWNLOAD XrayR BINARY
-#============================================================
+
 install_binary() {
     echo -e "${blue}[*] Lấy phiên bản mới nhất...${plain}"
 
@@ -116,9 +104,7 @@ install_binary() {
     echo -e "${green}[✓] Binary: $XRAYR_BIN${plain}"
 }
 
-#============================================================
-#  INSTALL MANAGEMENT COMMAND
-#============================================================
+
 install_mgmt_cmd() {
     echo -e "${blue}[*] Cài lệnh quản lý (XrayR start/stop/restart/log)...${plain}"
     curl -o /usr/bin/XrayR -Ls "$XRAYR_RELEASE_SH"
@@ -127,9 +113,7 @@ install_mgmt_cmd() {
     echo -e "${green}[✓] Xong${plain}"
 }
 
-#============================================================
-#  DOWNLOAD config.yml TỪ GITHUB CỦA BẠN
-#============================================================
+
 download_config() {
     echo -e "${blue}[*] Download config.yml...${plain}"
     mkdir -p /etc/XrayR
@@ -145,9 +129,39 @@ download_config() {
     echo -e "${green}[✓] config.yml OK${plain}"
 }
 
-#============================================================
-#  INPUT WIZARD
-#============================================================
+
+input_api_host() {
+    echo ""
+    echo -e "${cyan}  ───────────────────────────────────────${plain}"
+    echo -e "${yellow}   Nhập API URL của V2Board panel${plain}"
+    echo -e "${cyan}   VD: https://panel.example.com${plain}"
+    echo -e "${cyan}  ───────────────────────────────────────${plain}"
+    while true; do
+        echo -ne "${green}   API URL: ${plain}"
+        read -r api_host
+
+        api_host="${api_host%/}"
+        [[ -z "$api_host" ]]              && { echo -e "${red}    [!] Không rỗng.${plain}" ; continue ; }
+        [[ "$api_host" =~ ^https?:// ]]   && { echo -e "${green}    [✓] $api_host${plain}" ; break ; }
+        echo -e "${red}    [!] Phải bắt đầu bằng http:// hoặc https://${plain}"
+    done
+}
+
+input_api_key() {
+    echo ""
+    echo -e "${cyan}  ───────────────────────────────────────${plain}"
+    echo -e "${yellow}   Nhập API Key${plain}"
+    echo -e "${cyan}   (V2Board Admin → Settings → API)${plain}"
+    echo -e "${cyan}  ───────────────────────────────────────${plain}"
+    while true; do
+        echo -ne "${green}   API Key: ${plain}"
+        read -r api_key
+        [[ -z "$api_key" ]] && { echo -e "${red}    [!] Không rỗng.${plain}" ; continue ; }
+        echo -e "${green}    [✓] OK${plain}"
+        break
+    done
+}
+
 input_node_id() {
     echo ""
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
@@ -237,14 +251,13 @@ input_redis() {
     fi
 }
 
-#============================================================
-#  REVIEW & CONFIRM
-#============================================================
 review() {
     echo ""
     echo -e "${cyan}============================================================${plain}"
     echo -e "${bold}${yellow}   XÁC NHẬN TRƯỚC KHI CÀI${plain}"
     echo -e "${cyan}============================================================${plain}"
+    echo -e "   ${yellow}API URL    :${plain} $api_host"
+    echo -e "   ${yellow}API Key    :${plain} $(echo "$api_key" | sed 's/.\{4\}/****/')"
     echo -e "   ${yellow}Node ID    :${plain} $node_id"
     echo -e "   ${yellow}NodeType   :${plain} $node_type"
     [[ "$node_type" == "V2ray" ]] && echo -e "   ${blue}→ Nếu VLESS nhớ đổi EnableVless: true sau cài${plain}"
@@ -262,24 +275,23 @@ review() {
     [[ "$c" =~ ^[Yy] ]]
 }
 
-#============================================================
-#  PATCH config.yml
-#============================================================
 patch_config() {
     echo ""
     echo -e "${blue}[*] Patch config.yml...${plain}"
 
-    # NodeID & NodeType (indent 6 spaces, bên trong ApiConfig)
+    sed -i -E 's|^( +)ApiHost:.*$|      ApiHost: "'"$api_host"'"|' "$XRAYR_CFG"
+    sed -i -E 's|^( +)ApiKey:.*$|      ApiKey: "'"$api_key"'"|'   "$XRAYR_CFG"
+
     sed -i -E 's/^( +)NodeID:.*$/      NodeID: '"$node_id"'/'       "$XRAYR_CFG"
     sed -i -E 's/^( +)NodeType:.*$/      NodeType: '"$node_type"'/' "$XRAYR_CFG"
 
     if [[ "$redis_on" == "true" ]]; then
-        # Redis block indent 8 spaces (bên trong ControllerConfig → GlobalDeviceLimitConfig)
+     
         sed -i -E '/GlobalDeviceLimitConfig/{n; s/^( +)Enable:.*$/        Enable: true/}' "$XRAYR_CFG"
         sed -i -E 's/^( +)RedisAddr:.*$/        RedisAddr: '"$redis_addr"'/'         "$XRAYR_CFG"
         sed -i -E 's/^( +)RedisPassword:.*$/        RedisPassword: '"$redis_pass"'/' "$XRAYR_CFG"
         sed -i -E 's/^( +)RedisDB:.*$/        RedisDB: '"$redis_db"'/'             "$XRAYR_CFG"
-        # Timeout & Expiry chỉ patch bên trong block GlobalDeviceLimitConfig
+      
         sed -i -E '/GlobalDeviceLimitConfig/,/^[^ ]/{
             s/^( +)Timeout:.*$/        Timeout: '"$redis_timeout"'/
             s/^( +)Expiry:.*$/        Expiry: '"$redis_expiry"'/
@@ -289,9 +301,6 @@ patch_config() {
     echo -e "${green}[✓] Patch xong${plain}"
 }
 
-#============================================================
-#  SYSTEMD SERVICE
-#============================================================
 create_service() {
     echo -e "${blue}[*] Tạo systemd service...${plain}"
     cat > "$XRAYR_SVC" <<EOF
@@ -315,9 +324,6 @@ EOF
     echo -e "${green}[✓] Service OK${plain}"
 }
 
-#============================================================
-#  DISABLE FIREWALL
-#============================================================
 disable_fw() {
     echo -e "${blue}[*] Tắt firewall...${plain}"
     if command -v ufw &>/dev/null; then
@@ -329,9 +335,6 @@ disable_fw() {
     fi
 }
 
-#============================================================
-#  FULL INSTALL
-#============================================================
 do_install() {
     header
     echo -e "${bold}${cyan}── CÀI ĐẶT ──${plain}"
@@ -351,6 +354,8 @@ do_install() {
     install_mgmt_cmd
     download_config      || { read -rp "$(echo -e "${cyan}Enter...${plain}")" _ ; return ; }
 
+    input_api_host
+    input_api_key
     input_node_id
     input_node_type
     input_redis
@@ -380,9 +385,6 @@ do_install() {
     read -rp "$(echo -e "${cyan}\nÄn Enter...${plain}")" _
 }
 
-#============================================================
-#  UNINSTALL
-#============================================================
 do_uninstall() {
     header
     echo -e "${bold}${red}── GỡI CÀI ĐẶT ──${plain}"
@@ -407,9 +409,6 @@ do_uninstall() {
     read -rp "$(echo -e "${cyan}Enter...${plain}")" _
 }
 
-#============================================================
-#  MANAGE
-#============================================================
 do_manage() {
     while true; do
         header
@@ -451,9 +450,6 @@ do_manage() {
     done
 }
 
-#============================================================
-#  MAIN
-#============================================================
 main() {
     check_root
     while true; do
