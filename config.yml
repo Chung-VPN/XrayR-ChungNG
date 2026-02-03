@@ -16,10 +16,10 @@ ConnectionConfig:
   BufferSize: 64                          # The internal cache size of each connection, kB
 
 Nodes:
-  - PanelType: "NewV2board"               # ← đổi thành NewV2board cho V2Board panel của bạn
+  - PanelType: "V2board"               # ← đổi thành NewV2board cho V2Board panel của bạn
     ApiConfig:
-      ApiHost: "YOUR_PANEL_URL"           # ← Thay: https://panel-của-bạn.com
-      ApiKey: "YOUR_API_KEY"              # ← Thay: lấy từ V2Board → Settings → API
+      ApiHost: "https://vipdata88.com"           # ← Thay: https://panel-của-bạn.com
+      ApiKey: "cloudvn.cloudvn.cloudvn.cloudvn.cloudvn.cloudvn"              # ← Thay: lấy từ V2Board → Settings → API
       NodeID: 1                           # ← Script tự thay khi chạy
       NodeType: V2ray                     # ← Script tự thay khi chạy
       Timeout: 30
