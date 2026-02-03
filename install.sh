@@ -269,21 +269,20 @@ patch_config() {
     echo ""
     echo -e "${blue}[*] Patch config.yml...${plain}"
 
-    # NodeID & NodeType
+    # NodeID & NodeType (indent 6 spaces, bên trong ApiConfig)
     sed -i -E 's/^( +)NodeID:.*$/      NodeID: '"$node_id"'/'       "$XRAYR_CFG"
     sed -i -E 's/^( +)NodeType:.*$/      NodeType: '"$node_type"'/' "$XRAYR_CFG"
 
     if [[ "$redis_on" == "true" ]]; then
-        # Enable: true (chỉ dòng ngay sau GlobalDeviceLimitConfig)
-        sed -i -E '/GlobalDeviceLimitConfig/{n; s/^( +)Enable:.*$/      Enable: true/}' "$XRAYR_CFG"
-        # Các field Redis
-        sed -i -E 's/^( +)RedisAddr:.*$/      RedisAddr: "'"$redis_addr"'"/'         "$XRAYR_CFG"
-        sed -i -E 's/^( +)RedisPassword:.*$/      RedisPassword: "'"$redis_pass"'"/' "$XRAYR_CFG"
-        sed -i -E 's/^( +)RedisDB:.*$/      RedisDB: '"$redis_db"'/'                 "$XRAYR_CFG"
+        # Redis block indent 8 spaces (bên trong ControllerConfig → GlobalDeviceLimitConfig)
+        sed -i -E '/GlobalDeviceLimitConfig/{n; s/^( +)Enable:.*$/        Enable: true/}' "$XRAYR_CFG"
+        sed -i -E 's/^( +)RedisAddr:.*$/        RedisAddr: '"$redis_addr"'/'         "$XRAYR_CFG"
+        sed -i -E 's/^( +)RedisPassword:.*$/        RedisPassword: '"$redis_pass"'/' "$XRAYR_CFG"
+        sed -i -E 's/^( +)RedisDB:.*$/        RedisDB: '"$redis_db"'/'             "$XRAYR_CFG"
         # Timeout & Expiry chỉ patch bên trong block GlobalDeviceLimitConfig
         sed -i -E '/GlobalDeviceLimitConfig/,/^[^ ]/{
-            s/^( +)Timeout:.*$/      Timeout: '"$redis_timeout"'/
-            s/^( +)Expiry:.*$/      Expiry: '"$redis_expiry"'/
+            s/^( +)Timeout:.*$/        Timeout: '"$redis_timeout"'/
+            s/^( +)Expiry:.*$/        Expiry: '"$redis_expiry"'/
         }' "$XRAYR_CFG"
     fi
 
