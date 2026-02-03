@@ -24,7 +24,7 @@ XRAYR_RELEASE_SH="https://raw.githubusercontent.com/XrayR-project/XrayR-release/
 # Sau khi fork repo về GitHub của bạn, thay 2 giá trị dưới đây
 # bằng username và repo thật của bạn.
 # config.yml trong repo đó chứa API URL + API Key của panel (đã set sẵn).
-CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO/config.yml"
+CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG/config.yml"
 
 #============================================================
 #  UTILITY
