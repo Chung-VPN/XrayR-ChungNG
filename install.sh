@@ -1,6 +1,6 @@
 #!/bin/bash
 #============================================================
-#   XrayR Tự-Cài — V2Board
+#   XrayR Tự-Cài — V2Board (HỖ TRỢ 2 NODE TRÊN 1 VPS)
 #   Cách dùng:
 #     bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install.sh)
 #============================================================
@@ -67,7 +67,7 @@ svc_badge() {
 header() {
     clear
     echo -e "${cyan}============================================================${plain}"
-    echo -e "${bold}${green}         XrayR Tự-Cài — V2Board${plain}"
+    echo -e "${bold}${green}    XrayR Tự-Cài — V2Board (2 NODE / 1 VPS)${plain}"
     echo -e "${cyan}============================================================${plain}"
     svc_badge
     echo ""
@@ -212,9 +212,17 @@ download_config() {
 }
 
 #============================================================
-#  NHẬP THÔNG TIN
+#  NHẬP THÔNG TIN CHO NODE
 #============================================================
-input_api_host() {
+input_node_config() {
+    local node_num=$1  # 1 hoặc 2
+    
+    echo ""
+    echo -e "${cyan}╔═══════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║         CẤU HÌNH NODE ${node_num}                  ║${plain}"
+    echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
+    
+    # API Host
     echo ""
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     echo -e "${yellow}   Nhập địa chỉ V2Board Panel${plain}"
@@ -222,163 +230,224 @@ input_api_host() {
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     while true; do
         echo -ne "${green}   Địa chỉ Panel: ${plain}"
-        read -r api_host
-        api_host="${api_host%/}"
-        [[ -z "$api_host" ]]            && { echo -e "${red}    [!] Không thể rỗng.${plain}" ; continue ; }
-        [[ "$api_host" =~ ^https?:// ]] && { echo -e "${green}    [✓] $api_host${plain}" ; break ; }
-        echo -e "${red}    [!] Phải bắt đầu bằng http:// hoặc https://${plain}"
+        read -r api_host_tmp
+        api_host_tmp="${api_host_tmp%/}"
+        [[ -z "$api_host_tmp" ]] && { echo -e "${red}    [!] Không thể rỗng.${plain}" ; continue ; }
+        [[ ! "$api_host_tmp" =~ ^https?:// ]] && { echo -e "${red}    [!] Cần có http:// hoặc https://${plain}" ; continue ; }
+        break
     done
-}
-
-input_api_key() {
+    
+    if [[ $node_num -eq 1 ]]; then
+        api_host_node1="$api_host_tmp"
+    else
+        api_host_node2="$api_host_tmp"
+    fi
+    
+    # API Key
     echo ""
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     echo -e "${yellow}   Nhập API Key${plain}"
-    echo -e "${cyan}   (V2Board → Cài đặt → API)${plain}"
+    echo -e "${cyan}   Lấy từ: V2Board → Settings → API${plain}"
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     while true; do
         echo -ne "${green}   API Key: ${plain}"
-        read -r api_key
-        [[ -z "$api_key" ]] && { echo -e "${red}    [!] Không thể rỗng.${plain}" ; continue ; }
-        echo -e "${green}    [✓] Đã nhập${plain}"
+        read -r api_key_tmp
+        [[ -z "$api_key_tmp" ]] && { echo -e "${red}    [!] Không thể rỗng.${plain}" ; continue ; }
         break
     done
-}
-
-input_node_id() {
+    
+    if [[ $node_num -eq 1 ]]; then
+        api_key_node1="$api_key_tmp"
+    else
+        api_key_node2="$api_key_tmp"
+    fi
+    
+    # Node ID
     echo ""
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     echo -e "${yellow}   Nhập Node ID${plain}"
-    echo -e "${cyan}   (V2Board → Quản lý Nút → chọn nút → ID)${plain}"
+    echo -e "${cyan}   Lấy từ: V2Board → Nodes → Node ID${plain}"
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
     while true; do
         echo -ne "${green}   Node ID: ${plain}"
-        read -r node_id
-        [[ -z "$node_id" ]]          && { echo -e "${red}    [!] Không thể rỗng.${plain}" ; continue ; }
-        [[ "$node_id" =~ ^[0-9]+$ ]] && { echo -e "${green}    [✓] Node ID = $node_id${plain}" ; break ; }
-        echo -e "${red}    [!] Chỉ nhập số.${plain}"
+        read -r node_id_tmp
+        [[ ! "$node_id_tmp" =~ ^[0-9]+$ ]] && { echo -e "${red}    [!] Chỉ nhập số.${plain}" ; continue ; }
+        break
     done
-}
-
-input_node_type() {
+    
+    if [[ $node_num -eq 1 ]]; then
+        node_id_node1="$node_id_tmp"
+    else
+        node_id_node2="$node_id_tmp"
+    fi
+    
+    # Node Type
     echo ""
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
-    echo -e "${yellow}   Chọn giao thức${plain}"
+    echo -e "${yellow}   Chọn loại Node${plain}"
+    echo -e "${cyan}   1) V2ray   2) Trojan   3) Shadowsocks${plain}"
     echo -e "${cyan}  ───────────────────────────────────────${plain}"
-    echo -e "    ${cyan}1${plain}  VMESS / VLESS"
-    echo -e "    ${cyan}2${plain}  Trojan"
-    echo -e "    ${cyan}3${plain}  Shadowsocks"
-    echo ""
-    echo -e "  ${blue}💡 VMESS và VLESS đều chọn mục 1.${plain}"
-    echo -e "  ${blue}   Nếu nút là VLESS → sau cài đổi EnableVless: true trong config.yml.${plain}"
-    echo ""
     while true; do
-        echo -ne "${green}   Chọn [1/2/3]: ${plain}"
-        read -r ch
-        case "$ch" in
-            1) node_type="V2ray"       ; echo -e "${green}    [✓] VMESS / VLESS${plain}"  ; break ;;
-            2) node_type="Trojan"      ; echo -e "${green}    [✓] Trojan${plain}"         ; break ;;
-            3) node_type="Shadowsocks" ; echo -e "${green}    [✓] Shadowsocks${plain}"    ; break ;;
+        echo -ne "${green}   Chọn [1-3]: ${plain}"
+        read -r nt_choice
+        case "$nt_choice" in
+            1) node_type_tmp="V2ray" ; break ;;
+            2) node_type_tmp="Trojan" ; break ;;
+            3) node_type_tmp="Shadowsocks" ; break ;;
             *) echo -e "${red}    [!] Chỉ nhập 1, 2 hoặc 3.${plain}" ;;
         esac
     done
-}
-
-input_redis() {
-    echo ""
-    echo -e "${cyan}  ───────────────────────────────────────${plain}"
-    echo -e "${yellow}   Giới hạn số thiết bị (Redis)${plain}"
-    echo -e "${cyan}   Khóa 1 tài khoản chỉ đăng nhập được N máy${plain}"
-    echo -e "${cyan}  ───────────────────────────────────────${plain}"
-    echo -ne "${green}   Bạn có Redis không? [y/N]: ${plain}"
-    read -r re
-
-    if [[ "$re" =~ ^[Yy] ]]; then
-        redis_on="true"
-        echo ""
-
-        while true; do
-            echo -ne "${green}   Địa chỉ Redis (VD 127.0.0.1:6379): ${plain}"
-            read -r redis_addr
-            [[ -n "$redis_addr" ]] && { echo -e "${green}    [✓] $redis_addr${plain}" ; break ; }
-            echo -e "${red}    [!] Không thể rỗng${plain}"
-        done
-
-        echo ""
-        echo -ne "${green}   Mật khẩu Redis (Enter = không có): ${plain}"
-        read -r redis_pass
-        [[ -z "$redis_pass" ]] && echo -e "${yellow}    [—] Không có mật khẩu${plain}" || echo -e "${green}    [✓] Đã nhập${plain}"
-
-        echo ""
-        echo -ne "${green}   Redis DB [0]: ${plain}"
-        read -r redis_db ; [[ -z "$redis_db" ]] && redis_db=0
-        echo -e "${green}    [✓] DB = $redis_db${plain}"
-
-        echo ""
-        echo -ne "${green}   Thời gian chờ — Timeout (giây) [5]: ${plain}"
-        read -r redis_timeout ; [[ -z "$redis_timeout" ]] && redis_timeout=5
-        echo -e "${green}    [✓] Timeout = ${redis_timeout}s${plain}"
-
-        echo ""
-        echo -ne "${green}   Thời gian hết hạn — Expiry (giây) [60]: ${plain}"
-        read -r redis_expiry ; [[ -z "$redis_expiry" ]] && redis_expiry=60
-        echo -e "${green}    [✓] Expiry = ${redis_expiry}s${plain}"
+    
+    if [[ $node_num -eq 1 ]]; then
+        node_type_node1="$node_type_tmp"
     else
-        redis_on="false"
-        echo -e "${yellow}    [—] Bỏ qua giới hạn thiết bị${plain}"
+        node_type_node2="$node_type_tmp"
     fi
 }
 
 #============================================================
-#  XÁC NHẬN
+#  NHẬP REDIS (CHUNG CHO CẢ 2 NODE)
+#============================================================
+input_redis() {
+    echo ""
+    echo -e "${cyan}╔═══════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║         CẤU HÌNH REDIS (CHUNG)            ║${plain}"
+    echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
+    echo ""
+    echo -e "${yellow}Bật GlobalDeviceLimit qua Redis?${plain}"
+    echo -e "${cyan}(Giới hạn số thiết bị đồng thời trên nhiều node)${plain}"
+    echo -ne "${green}[y/N]: ${plain}"
+    read -r redis_choice
+    
+    if [[ "$redis_choice" =~ ^[Yy] ]]; then
+        redis_on="true"
+        
+        echo ""
+        echo -ne "${green}Redis Addr (VD: 127.0.0.1:6379): ${plain}"
+        read -r redis_addr
+        [[ -z "$redis_addr" ]] && redis_addr="127.0.0.1:6379"
+        
+        echo -ne "${green}Redis Password (bỏ trống nếu không có): ${plain}"
+        read -r redis_pass
+        [[ -z "$redis_pass" ]] && redis_pass='""'
+        
+        echo -ne "${green}Redis Timeout (giây, mặc định 5): ${plain}"
+        read -r redis_timeout
+        [[ -z "$redis_timeout" ]] && redis_timeout=5
+        
+        echo -ne "${green}Redis Expiry (giây, mặc định 60): ${plain}"
+        read -r redis_expiry
+        [[ -z "$redis_expiry" ]] && redis_expiry=60
+    else
+        redis_on="false"
+    fi
+}
+
+#============================================================
+#  XEM LẠI CẤU HÌNH
 #============================================================
 review() {
     echo ""
-    echo -e "${cyan}============================================================${plain}"
-    echo -e "${bold}${yellow}   XÁC NHẬN THÔNG TIN${plain}"
-    echo -e "${cyan}============================================================${plain}"
-    echo -e "   ${yellow}Địa chỉ Panel :${plain} $api_host"
-    echo -e "   ${yellow}API Key        :${plain} $(echo "$api_key" | sed 's/.\{4\}/****/')"
-    echo -e "   ${yellow}Node ID        :${plain} $node_id"
-    echo -e "   ${yellow}Giao thức      :${plain} $node_type"
-    [[ "$node_type" == "V2ray" ]] && echo -e "   ${blue}   → Nếu VLESS nhớ đổi EnableVless: true sau cài${plain}"
-    echo -e "   ${yellow}Giới hạn máy   :${plain} $redis_on"
-    if [[ "$redis_on" == "true" ]]; then
-        echo -e "     ${yellow}Địa chỉ Redis :${plain} $redis_addr"
-        echo -e "     ${yellow}DB            :${plain} $redis_db"
-        echo -e "     ${yellow}Timeout       :${plain} ${redis_timeout}s"
-        echo -e "     ${yellow}Expiry        :${plain} ${redis_expiry}s"
+    echo -e "${cyan}╔═══════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║         XEM LẠI CẤU HÌNH                  ║${plain}"
+    echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
+    
+    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node1" ]]; then
+        echo ""
+        echo -e "${bold}${green}NODE 1:${plain}"
+        echo -e "  Panel URL:  ${cyan}$api_host_node1${plain}"
+        echo -e "  API Key:    ${cyan}${api_key_node1:0:20}...${plain}"
+        echo -e "  Node ID:    ${cyan}$node_id_node1${plain}"
+        echo -e "  Node Type:  ${cyan}$node_type_node1${plain}"
     fi
-    echo -e "${cyan}============================================================${plain}"
+    
+    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node2" ]]; then
+        echo ""
+        echo -e "${bold}${green}NODE 2:${plain}"
+        echo -e "  Panel URL:  ${cyan}$api_host_node2${plain}"
+        echo -e "  API Key:    ${cyan}${api_key_node2:0:20}...${plain}"
+        echo -e "  Node ID:    ${cyan}$node_id_node2${plain}"
+        echo -e "  Node Type:  ${cyan}$node_type_node2${plain}"
+    fi
+    
     echo ""
-    echo -ne "${green}   Thông tin đúng rồi? Tiếp tục cài? [y/N]: ${plain}"
-    read -r c
-    [[ "$c" =~ ^[Yy] ]]
+    echo -e "${bold}${green}REDIS:${plain}"
+    if [[ "$redis_on" == "true" ]]; then
+        echo -e "  Enable:     ${cyan}true${plain}"
+        echo -e "  Addr:       ${cyan}$redis_addr${plain}"
+        echo -e "  Timeout:    ${cyan}${redis_timeout}s${plain}"
+        echo -e "  Expiry:     ${cyan}${redis_expiry}s${plain}"
+    else
+        echo -e "  Enable:     ${cyan}false${plain}"
+    fi
+    
+    echo ""
+    echo -ne "${green}Xác nhận cấu hình? [y/N]: ${plain}"
+    read -r confirm
+    [[ "$confirm" =~ ^[Yy] ]]
 }
 
 #============================================================
-#  PATCH config.yml
+#  GHI CẤU HÌNH VÀO config.yml
 #============================================================
 patch_config() {
     echo ""
     echo -e "${blue}[*] Ghi cấu hình vào config.yml...${plain}"
-
-    sed -i -E 's|^( +)ApiHost:.*$|      ApiHost: "'"$api_host"'"|' "$XRAYR_CFG"
-    sed -i -E 's|^( +)ApiKey:.*$|      ApiKey: "'"$api_key"'"|'   "$XRAYR_CFG"
-    sed -i -E 's/^( +)NodeID:.*$/      NodeID: '"$node_id"'/'       "$XRAYR_CFG"
-    sed -i -E 's/^( +)NodeType:.*$/      NodeType: '"$node_type"'/' "$XRAYR_CFG"
-
-    if [[ "$redis_on" == "true" ]]; then
-        sed -i -E '/GlobalDeviceLimitConfig/{n; s/^( +)Enable:.*$/        Enable: true/}' "$XRAYR_CFG"
-        sed -i -E 's/^( +)RedisAddr:.*$/        RedisAddr: '"$redis_addr"'/'         "$XRAYR_CFG"
-        sed -i -E 's/^( +)RedisPassword:.*$/        RedisPassword: '"$redis_pass"'/' "$XRAYR_CFG"
-        sed -i -E 's/^( +)RedisDB:.*$/        RedisDB: '"$redis_db"'/'             "$XRAYR_CFG"
-        sed -i -E '/GlobalDeviceLimitConfig/,/^[^ ]/{
-            s/^( +)Timeout:.*$/        Timeout: '"$redis_timeout"'/
-            s/^( +)Expiry:.*$/        Expiry: '"$redis_expiry"'/
-        }' "$XRAYR_CFG"
+    
+    # Backup
+    cp "$XRAYR_CFG" "$XRAYR_CFG.backup"
+    
+    # Cập nhật Node 1 (node đầu tiên trong file)
+    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node1" ]]; then
+        # Tìm dòng đầu tiên của Node 1 (YOUR_PANEL_URL_NODE1)
+        sed -i "0,/YOUR_PANEL_URL_NODE1/s|YOUR_PANEL_URL_NODE1|$api_host_node1|" "$XRAYR_CFG"
+        sed -i "0,/YOUR_API_KEY_NODE1/s|YOUR_API_KEY_NODE1|$api_key_node1|" "$XRAYR_CFG"
+        
+        # Tìm NodeID và NodeType đầu tiên (của Node 1)
+        sed -i "0,/NodeID: 1/s|NodeID: 1|NodeID: $node_id_node1|" "$XRAYR_CFG"
+        sed -i "0,/NodeType: V2ray/s|NodeType: V2ray|NodeType: $node_type_node1|" "$XRAYR_CFG"
     fi
-
+    
+    # Cập nhật Node 2 (node thứ hai trong file)
+    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node2" ]]; then
+        # Tìm dòng thứ hai của Node 2 (YOUR_PANEL_URL_NODE2)
+        sed -i "0,/YOUR_PANEL_URL_NODE2/s|YOUR_PANEL_URL_NODE2|$api_host_node2|" "$XRAYR_CFG"
+        sed -i "0,/YOUR_API_KEY_NODE2/s|YOUR_API_KEY_NODE2|$api_key_node2|" "$XRAYR_CFG"
+        
+        # Tìm NodeID và NodeType thứ hai (của Node 2)
+        sed -i "0,/NodeID: 2/s|NodeID: 2|NodeID: $node_id_node2|" "$XRAYR_CFG"
+        sed -i "0,/NodeType: Trojan/s|NodeType: Trojan|NodeType: $node_type_node2|" "$XRAYR_CFG"
+    fi
+    
+    # Cập nhật Redis cho cả 2 node nếu bật
+    if [[ "$redis_on" == "true" ]]; then
+        # Enable Redis cho Node 1 (lần xuất hiện đầu tiên)
+        sed -i "0,/Enable: false.*# ← Script/s|Enable: false.*# ← Script.*|Enable: true                     # ← Script tự đổi thành true nếu enable Redis|" "$XRAYR_CFG"
+        # Enable Redis cho Node 2 (lần xuất hiện thứ hai)
+        sed -i "0,/Enable: false.*# ← Script/s|Enable: false.*# ← Script.*|Enable: true                     # ← Script tự đổi thành true nếu enable Redis|" "$XRAYR_CFG"
+        
+        # Cập nhật RedisAddr, RedisPassword, v.v. cho cả 2 node
+        sed -i "s|RedisAddr: 127.0.0.1:6379.*|RedisAddr: $redis_addr|g" "$XRAYR_CFG"
+        
+        if [[ "$redis_pass" != '""' ]]; then
+            sed -i "s|RedisPassword:.*# ← Script|RedisPassword: $redis_pass       # ← Script|g" "$XRAYR_CFG"
+        fi
+        
+        sed -i "s|Timeout: 5.*# ← Script|Timeout: $redis_timeout                        # ← Script|g" "$XRAYR_CFG"
+        sed -i "s|Expiry: 60.*# ← Script|Expiry: $redis_expiry                        # ← Script|g" "$XRAYR_CFG"
+    fi
+    
+    # Xóa node không dùng
+    if [[ "$install_mode" == "node1" ]]; then
+        # Xóa Node 2 khỏi config
+        sed -i '/# ====== NODE 2 ======/,$ d' "$XRAYR_CFG"
+    elif [[ "$install_mode" == "node2" ]]; then
+        # Xóa Node 1, giữ Node 2
+        # Tìm dòng "# ====== NODE 2 ======" và xóa từ "Nodes:" đến trước dòng này
+        awk '/# ====== NODE 2 ======/{flag=1} flag; !flag && /^Nodes:/{print; getline; next}' "$XRAYR_CFG" > "$XRAYR_CFG.tmp"
+        mv "$XRAYR_CFG.tmp" "$XRAYR_CFG"
+    fi
+    
     echo -e "${green}[✓] Ghi xong${plain}"
 }
 
@@ -389,7 +458,7 @@ create_service() {
     echo -e "${blue}[*] Tạo dịch vụ hệ thống...${plain}"
     cat > "$XRAYR_SVC" <<EOF
 [Unit]
-Description=XrayR V2Board Node
+Description=XrayR V2Board Multi-Node
 After=network-online.target
 Wants=network-online.target
 
@@ -423,6 +492,27 @@ do_install() {
         echo ""
     fi
 
+    # Chọn chế độ cài đặt
+    echo -e "${cyan}╔═══════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║       CHỌN CHẾ ĐỘ CÀI ĐẶT                ║${plain}"
+    echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
+    echo ""
+    echo -e "  ${green}1${plain}  Cài cả 2 node (Node 1 + Node 2)"
+    echo -e "  ${green}2${plain}  Chỉ cài Node 1"
+    echo -e "  ${green}3${plain}  Chỉ cài Node 2"
+    echo ""
+    
+    while true; do
+        echo -ne "${green}  Chọn [1-3]: ${plain}"
+        read -r mode_choice
+        case "$mode_choice" in
+            1) install_mode="both" ; break ;;
+            2) install_mode="node1" ; break ;;
+            3) install_mode="node2" ; break ;;
+            *) echo -e "${red}  [!] Chỉ nhập 1, 2 hoặc 3${plain}" ;;
+        esac
+    done
+
     detect_os
     detect_arch
     install_deps
@@ -430,10 +520,16 @@ do_install() {
     install_binary       || { wait_key ; return ; }
     download_config      || { wait_key ; return ; }
 
-    input_api_host
-    input_api_key
-    input_node_id
-    input_node_type
+    # Nhập thông tin cho từng node
+    if [[ "$install_mode" == "both" ]]; then
+        input_node_config 1
+        input_node_config 2
+    elif [[ "$install_mode" == "node1" ]]; then
+        input_node_config 1
+    else
+        input_node_config 2
+    fi
+    
     input_redis
 
     review || { echo -e "${yellow}\n[—] Hủy cài đặt.${plain}" ; wait_key ; return ; }
@@ -445,11 +541,15 @@ do_install() {
     echo -e "${blue}[*] Khởi động XrayR...${plain}"
     systemctl enable XrayR > /dev/null 2>&1
     systemctl start  XrayR
-    sleep 2
+    sleep 3
 
     if systemctl is-active --quiet XrayR; then
         echo -e "${green}${bold}[✓✓] XrayR đang chạy thành công!${plain}"
-        echo -e "${green}     Nút sẽ tự đồng bộ với V2Board panel trong vài giây.${plain}"
+        if [[ "$install_mode" == "both" ]]; then
+            echo -e "${green}     Cả 2 node sẽ tự đồng bộ với V2Board panel trong vài giây.${plain}"
+        else
+            echo -e "${green}     Node sẽ tự đồng bộ với V2Board panel trong vài giây.${plain}"
+        fi
     else
         echo -e "${red}[✗] XrayR chưa chạy được. Kiểm tra log bằng:${plain}"
         echo -e "${yellow}    Chọn mục 2 → 5 (Xem thông tin lỗi)${plain}"
@@ -477,7 +577,7 @@ do_uninstall() {
     echo -e "${red}    • Dịch vụ systemd${plain}"
     echo ""
     echo -ne "${green}  Xác nhận gỡ cài đặt? [y/N]: ${plain}"
-    read -r yn ; [[ "$yn" =~ ^[Yy] ]] || { echo -e "${yellow}[—] Hủy${plain}" ; return ; }
+    read -r yn ; [[ "$yn" =~ ^[Yy] ]] || { echo -e "${yellow}[—] Hủy${plain}" ; wait_key ; return ; }
 
     systemctl stop    XrayR 2>/dev/null
     systemctl disable XrayR 2>/dev/null
@@ -555,7 +655,7 @@ do_manage() {
                 fi
                 wait_key ;;
             0) return ;;
-            *) echo -e "${red}[!] Chỉ nhập 0–6${plain}" ;;
+            *) echo -e "${red}[!] Chỉ nhập 0–6${plain}" ; wait_key ;;
         esac
     done
 }
@@ -581,7 +681,7 @@ main() {
             2) do_manage    ;;
             3) do_uninstall ;;
             0) echo -e "${green}\n  Tạm biệt!\n${plain}" ; exit 0 ;;
-            *) echo -e "${red}  [!] Chỉ nhập 0–3${plain}" ;;
+            *) echo -e "${red}  [!] Chỉ nhập 0–3${plain}" ; wait_key ;;
         esac
     done
 }

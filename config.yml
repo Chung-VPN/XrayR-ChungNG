@@ -16,12 +16,13 @@ ConnectionConfig:
   BufferSize: 64                          # The internal cache size of each connection, kB
 
 Nodes:
-  - PanelType: "NewV2board"               # ← đổi thành NewV2board cho V2Board panel của bạn
+  # ====== NODE 1 ======
+  - PanelType: "NewV2board"               # ← Đổi thành NewV2board cho V2Board panel của bạn
     ApiConfig:
-      ApiHost: "YOUR_PANEL_URL"           # ← Thay: https://panel-của-bạn.com
-      ApiKey: "YOUR_API_KEY"              # ← Thay: lấy từ V2Board → Settings → API
+      ApiHost: "YOUR_PANEL_URL_NODE1"     # ← Thay: https://panel-của-bạn.com
+      ApiKey: "YOUR_API_KEY_NODE1"        # ← Thay: lấy từ V2Board → Settings → API
       NodeID: 1                           # ← Script tự thay khi chạy
-      NodeType: V2ray                     # ← Script tự thay khi chạy
+      NodeType: V2ray                     # ← Script tự thay khi chạy (V2ray, Trojan, Shadowsocks)
       Timeout: 30
       EnableVless: false                  # đổi thành true nếu node là VLESS
       VlessFlow: "xtls-rprx-vision"       # chỉ dùng khi VLESS
@@ -51,6 +52,80 @@ Nodes:
         RedisUsername:                    # Redis username (bỏ trống nếu không có)
         RedisPassword:                    # ← Script tự thay
         RedisDB: 0                        # ← Script tự thay
+        Timeout: 5                        # ← Script tự thay
+        Expiry: 60                        # ← Script tự thay (seconds)
+
+      EnableFallback: false               # chỉ cho Trojan và Vless
+      FallBackConfigs:
+        - SNI:                            # TLS SNI, empty = any
+          Alpn:                           # empty = any
+          Path:                           # HTTP PATH, empty = any
+          Dest: 80                        # destination port
+          ProxyProtocolVer: 0
+
+      DisableLocalREALITYConfig: false
+      EnableREALITY: false                # enable nếu dùng REALITY
+      REALITYConfigs:
+        Show: true
+        Dest: www.amazon.com:443
+        ProxyProtocolVer: 0
+        ServerNames:
+          - www.amazon.com
+        PrivateKey: YOUR_PRIVATE_KEY      # chạy './XrayR x25519' để generate
+        MinClientVer:
+        MaxClientVer:
+        MaxTimeDiff: 0
+        ShortIds:
+          - ""
+          - 0123456789abcdef
+
+      CertConfig:
+        CertMode: none                    # none / file / http / tls / dns
+        CertDomain: ""                    # domain để cert
+        CertFile:                         # path cert file nếu CertMode: file
+        KeyFile:                          # path key file nếu CertMode: file
+        Provider: alidns                  # DNS provider (nếu CertMode: dns)
+        Email:                            # email đăng ký cert
+        DNSEnv:                           # env vars của DNS provider
+          ALICLOUD_ACCESS_KEY:
+          ALICLOUD_SECRET_KEY:
+
+  # ====== NODE 2 ======
+  - PanelType: "NewV2board"               # ← Đổi thành NewV2board cho V2Board panel của bạn
+    ApiConfig:
+      ApiHost: "YOUR_PANEL_URL_NODE2"     # ← Thay: https://panel-của-bạn.com
+      ApiKey: "YOUR_API_KEY_NODE2"        # ← Thay: lấy từ V2Board → Settings → API
+      NodeID: 2                           # ← Script tự thay khi chạy
+      NodeType: Trojan                    # ← Script tự thay khi chạy (V2ray, Trojan, Shadowsocks)
+      Timeout: 30
+      EnableVless: false                  # đổi thành true nếu node là VLESS
+      VlessFlow: "xtls-rprx-vision"       # chỉ dùng khi VLESS
+      SpeedLimit: 0                       # Mbps, 0 = disable
+      DeviceLimit: 0                      # 0 = disable
+      RuleListPath:                       # /etc/XrayR/rulelist
+      DisableCustomConfig: false
+
+    ControllerConfig:
+      ListenIP: 0.0.0.0
+      SendIP: 0.0.0.0
+      UpdatePeriodic: 60                  # sync với panel mỗi 60 giây
+      EnableDNS: false
+      DNSType: AsIs                       # AsIs, UseIP, UseIPv4, UseIPv6
+      EnableProxyProtocol: false          # chỉ cho WebSocket & TCP
+
+      AutoSpeedLimitConfig:
+        Limit: 0                          # Warned speed (mbps), 0 = disable
+        WarnTimes: 0                      # 0 = kick ngay khi overspeed
+        LimitSpeed: 0                     # Speed limit sau khi bị phạt (mbps)
+        LimitDuration: 0                  # Thời gian bị limit (phút)
+
+      GlobalDeviceLimitConfig:
+        Enable: false                     # ← Script tự đổi thành true nếu enable Redis
+        RedisNetwork: tcp                 # tcp hoặc unix
+        RedisAddr: 127.0.0.1:6379         # ← Script tự thay
+        RedisUsername:                    # Redis username (bỏ trống nếu không có)
+        RedisPassword:                    # ← Script tự thay
+        RedisDB: 1                        # ← Script tự thay (khác DB với node 1)
         Timeout: 5                        # ← Script tự thay
         Expiry: 60                        # ← Script tự thay (seconds)
 
