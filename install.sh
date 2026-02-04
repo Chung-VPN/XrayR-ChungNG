@@ -1,7 +1,8 @@
 #!/bin/bash
 #============================================================
-#   XrayR Auto-Install — V2Board (1-2 Nodes)
-#   Usage: bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install.sh)
+#   XrayR Multi-Node Installer — V2Board
+#   Hỗ trợ: 1-2 nodes cùng lúc
+#   Cách dùng: bash <(curl -Ls YOUR_URL/install.sh)
 #============================================================
 
 red='\033[0;31m'
@@ -12,16 +13,17 @@ blue='\033[0;34m'
 bold='\033[1m'
 plain='\033[0m'
 
+# ── PATHS ───────────────────────────────────────────────
 XRAYR_DIR="/usr/local/XrayR"
 XRAYR_BIN="$XRAYR_DIR/XrayR"
 XRAYR_CFG="/etc/XrayR/config.yml"
 XRAYR_SVC="/etc/systemd/system/XrayR.service"
 
-CONFIG_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG@main/config.yml"
-
+#============================================================
+#  TIỆN ÍCH
 #============================================================
 check_root() {
-    [[ $EUID -ne 0 ]] && echo -e "${red}Cần chạy bằng root!${plain}" && exit 1
+    [[ $EUID -ne 0 ]] && echo -e "${red}❌ Cần chạy bằng root!  →  sudo bash install.sh${plain}" && exit 1
 }
 
 detect_os() {
@@ -32,7 +34,7 @@ detect_os() {
     elif grep -Eqi "debian|ubuntu" /proc/version 2>/dev/null; then
         release="debian"
     else
-        echo -e "${red}Không nhận diện được OS!${plain}"
+        echo -e "${red}❌ Không nhận diện được hệ điều hành!${plain}"
         exit 1
     fi
 }
@@ -45,7 +47,7 @@ detect_arch() {
         armv7|armv7l)   arch="arm32-v7a" ;;
         armv6l)         arch="arm32-v6" ;;
         *)
-            echo -e "${red}Kiến trúc không hỗ trợ: $raw_arch${plain}"
+            echo -e "${red}❌ Kiến trúc không hỗ trợ: $raw_arch${plain}"
             exit 1
             ;;
     esac
@@ -55,26 +57,31 @@ is_installed() { [[ -f "$XRAYR_BIN" ]]; }
 
 header() {
     clear
-    echo -e "${cyan}============================================================${plain}"
-    echo -e "${bold}${green}   XrayR Multi-Node Installer — V2Board${plain}"
-    echo -e "${cyan}============================================================${plain}"
+    echo -e "${cyan}╔══════════════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║                                                      ║${plain}"
+    echo -e "${cyan}║${plain}    ${bold}${green}XrayR Multi-Node Installer — V2Board${plain}       ${cyan}║${plain}"
+    echo -e "${cyan}║                                                      ║${plain}"
+    echo -e "${cyan}╚══════════════════════════════════════════════════════╝${plain}"
+    
     if ! is_installed; then
-        echo -e "  Trạng thái: ${red}● Chưa cài${plain}"
+        echo -e "  Trạng thái: ${red}● Chưa cài đặt${plain}"
     elif systemctl is-active --quiet XrayR 2>/dev/null; then
         echo -e "  Trạng thái: ${green}● Đang chạy${plain}"
     else
-        echo -e "  Trạng thái: ${yellow}● Đã cài${plain}"
+        echo -e "  Trạng thái: ${yellow}● Đã cài, chưa chạy${plain}"
     fi
     echo ""
 }
 
 wait_key() {
-    read -rp "$(echo -e "${cyan}Ấn Enter...${plain}")" _
+    read -rp "$(echo -e "${cyan}▶ Ấn Enter để tiếp tục...${plain}")" _
 }
 
 #============================================================
+#  CÀI DEPENDENCIES
+#============================================================
 install_deps() {
-    echo -e "${blue}[*] Cài dependencies...${plain}"
+    echo -e "${blue}[●] Cài các gói cần thiết...${plain}"
     if [[ "$release" == "centos" ]]; then
         yum install -y -q curl wget unzip 2>/dev/null
     else
@@ -84,218 +91,387 @@ install_deps() {
     echo -e "${green}[✓] Xong${plain}"
 }
 
+#============================================================
+#  TẮT FIREWALL
+#============================================================
 disable_fw() {
-    echo -e "${blue}[*] Tắt firewall...${plain}"
+    echo -e "${blue}[●] Tắt firewall...${plain}"
     if command -v ufw &>/dev/null; then
         ufw disable &>/dev/null
+        echo -e "${green}[✓] UFW đã tắt${plain}"
     elif command -v firewall-cmd &>/dev/null; then
         systemctl stop firewalld &>/dev/null
         systemctl disable firewalld &>/dev/null
+        echo -e "${green}[✓] Firewalld đã tắt${plain}"
+    else
+        echo -e "${yellow}[—] Không có firewall${plain}"
     fi
-    echo -e "${green}[✓] OK${plain}"
 }
 
 #============================================================
+#  DỌN DẸP CÀI ĐẶT CŨ
+#============================================================
+cleanup_old() {
+    echo -e "${blue}[●] Dọn dẹp cài đặt cũ...${plain}"
+    
+    local cleaned=false
+    
+    if systemctl is-active --quiet XrayR 2>/dev/null; then
+        echo -e "${yellow}  → Dừng service cũ...${plain}"
+        systemctl stop XrayR 2>/dev/null
+        cleaned=true
+    fi
+    
+    if [[ -f "$XRAYR_SVC" ]]; then
+        systemctl disable XrayR 2>/dev/null
+        rm -f "$XRAYR_SVC"
+        cleaned=true
+    fi
+    
+    if [[ -d "$XRAYR_DIR" ]]; then
+        rm -rf "$XRAYR_DIR"
+        cleaned=true
+    fi
+    
+    if [[ -d "/etc/XrayR" ]]; then
+        rm -rf /etc/XrayR
+        cleaned=true
+    fi
+    
+    if [[ "$cleaned" == true ]]; then
+        systemctl daemon-reload 2>/dev/null
+        echo -e "${green}[✓] Đã dọn sạch${plain}"
+    else
+        echo -e "${green}[✓] Không có cài đặt cũ${plain}"
+    fi
+}
+
+#============================================================
+#  TẢI XrayR
+#============================================================
 install_binary() {
-    echo -e "${blue}[*] Tải XrayR...${plain}"
+    echo -e "${blue}[●] Tải XrayR (kiến trúc: ${arch})...${plain}"
     mkdir -p "$XRAYR_DIR"
     
     local url="https://github.com/XrayR-project/XrayR/releases/latest/download/XrayR-linux-${arch}.zip"
-    local zip_path="$XRAYR_DIR/XrayR.zip"
+    local mirrors=(
+        "$url"
+        "https://cdn.jsdelivr.net/gh/XrayR-project/XrayR@latest/releases/XrayR-linux-${arch}.zip"
+        "https://ghproxy.com/$url"
+    )
     
-    # Thử tải 3 lần
-    local success=false
-    for i in 1 2 3; do
-        echo -e "${blue}    Lần thử $i/3...${plain}"
-        if wget -q --show-progress --timeout=30 -O "$zip_path" "$url" 2>&1; then
-            if [[ -s "$zip_path" ]] && file "$zip_path" 2>/dev/null | grep -qi "zip"; then
-                success=true
-                break
+    local zip_path="$XRAYR_DIR/XrayR.zip"
+    local downloaded=false
+    
+    for mirror in "${mirrors[@]}"; do
+        echo -e "${blue}  → Đang tải...${plain}"
+        
+        for attempt in 1 2 3; do
+            if curl -fSL --connect-timeout 15 --max-time 600 \
+                    --progress-bar -o "$zip_path" "$mirror" 2>&1; then
+                
+                if [[ -s "$zip_path" ]] && file "$zip_path" 2>/dev/null | grep -qi "zip"; then
+                    echo -e "${green}[✓] Tải thành công (lần $attempt)${plain}"
+                    downloaded=true
+                    break 2
+                fi
             fi
-        fi
-        rm -f "$zip_path"
-        sleep 2
+            
+            rm -f "$zip_path"
+            [[ $attempt -lt 3 ]] && sleep 2
+        done
     done
     
-    if [[ "$success" != true ]]; then
-        echo -e "${red}[✗] Tải thất bại sau 3 lần thử${plain}"
+    if [[ "$downloaded" != true ]]; then
+        echo -e "${red}[✗] Tải thất bại sau nhiều lần thử${plain}"
         return 1
     fi
     
-    echo -e "${blue}[*] Giải nén...${plain}"
+    # Giải nén
+    echo -e "${blue}[●] Giải nén...${plain}"
     cd "$XRAYR_DIR" || return 1
-    unzip -oq "$zip_path" 2>/dev/null || {
+    
+    if ! unzip -oq "$zip_path" 2>/dev/null; then
         echo -e "${red}[✗] Giải nén thất bại${plain}"
         return 1
-    }
+    fi
     
     rm -f "$zip_path"
     chmod +x "$XRAYR_BIN"
+    
+    # Copy config mẫu
+    mkdir -p /etc/XrayR
+    if [[ -f "$XRAYR_DIR/config.yml" ]]; then
+        cp "$XRAYR_DIR/config.yml" "$XRAYR_CFG"
+    fi
+    
     echo -e "${green}[✓] Cài binary thành công${plain}"
 }
 
-download_config() {
-    echo -e "${blue}[*] Tải config...${plain}"
-    mkdir -p /etc/XrayR
-    
-    if ! curl -fsSL -o "$XRAYR_CFG" "$CONFIG_URL" 2>/dev/null; then
-        echo -e "${red}[✗] Tải config thất bại${plain}"
-        return 1
-    fi
-    echo -e "${green}[✓] Config đã tải${plain}"
-}
-
 #============================================================
-# HÀM NHẬP THÔNG TIN - ĐƠN GIẢN HÓA
+#  NHẬP THÔNG TIN - HỖ TRỢ 1-2 NODE
 #============================================================
 input_all_info() {
-    # Hỏi số node
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  Cài bao nhiêu node?           ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
+    # ── Số node ──
+    echo ""
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  BẠN MUỐN CÀI BAO NHIÊU NODE?              ║${plain}"
+    echo -e "${cyan}║  (1 hoặc 2 node trên cùng 1 VPS)           ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
     echo ""
     while true; do
-        echo -ne "${green}Nhập 1 hoặc 2: ${plain}"
+        echo -ne "${green}▶ Nhập 1 hoặc 2: ${plain}"
         read -r num_nodes
         [[ "$num_nodes" == "1" ]] || [[ "$num_nodes" == "2" ]] && break
-        echo -e "${red}Chỉ nhập 1 hoặc 2!${plain}"
+        echo -e "${red}  ⚠ Chỉ nhập 1 hoặc 2!${plain}"
     done
     
-    # Panel URL (chung cho tất cả node)
+    # ── Panel URL (chung cho tất cả node) ──
     echo ""
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  Địa chỉ V2Board Panel         ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  ĐỊA CHỈ V2BOARD PANEL                     ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
     while true; do
-        echo -ne "${green}VD https://panel.com: ${plain}"
+        echo -ne "${green}▶ VD https://panel.example.com: ${plain}"
         read -r panel_url
         panel_url="${panel_url%/}"
         [[ "$panel_url" =~ ^https?:// ]] && break
-        echo -e "${red}Phải có http:// hoặc https://${plain}"
+        echo -e "${red}  ⚠ Phải có http:// hoặc https://${plain}"
     done
     
-    # API Key (chung)
+    # ── API Key (chung) ──
     echo ""
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  API Key (V2Board Settings)    ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  API KEY                                   ║${plain}"
+    echo -e "${cyan}║  (V2Board → Cài đặt → API)                 ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
     while true; do
-        echo -ne "${green}API Key: ${plain}"
+        echo -ne "${green}▶ API Key: ${plain}"
         read -r api_key
         [[ -n "$api_key" ]] && break
-        echo -e "${red}Không được rỗng!${plain}"
+        echo -e "${red}  ⚠ Không được rỗng!${plain}"
     done
     
-    # Node 1 ID
+    # ── Node 1 ──
     echo ""
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  NODE 1 - Node ID              ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  NODE 1 - THÔNG TIN                        ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
+    
     while true; do
-        echo -ne "${green}Node 1 ID: ${plain}"
+        echo -ne "${green}▶ Node 1 ID: ${plain}"
         read -r node1_id
         [[ "$node1_id" =~ ^[0-9]+$ ]] && break
-        echo -e "${red}Chỉ nhập số!${plain}"
+        echo -e "${red}  ⚠ Chỉ nhập số!${plain}"
     done
     
-    # Node 1 Type
-    echo -e "${cyan}Loại node: 1) V2ray  2) Trojan  3) Shadowsocks${plain}"
+    echo ""
+    echo -e "${yellow}Chọn loại giao thức cho Node 1:${plain}"
+    echo -e "  ${cyan}1${plain} → VMESS / VLESS"
+    echo -e "  ${cyan}2${plain} → Trojan"
+    echo -e "  ${cyan}3${plain} → Shadowsocks"
+    
     while true; do
-        echo -ne "${green}Chọn [1-3]: ${plain}"
-        read -r n1_type
-        case "$n1_type" in
+        echo -ne "${green}▶ Chọn [1-3]: ${plain}"
+        read -r n1_choice
+        case "$n1_choice" in
             1) node1_type="V2ray" ; break ;;
             2) node1_type="Trojan" ; break ;;
             3) node1_type="Shadowsocks" ; break ;;
-            *) echo -e "${red}Chỉ nhập 1-3!${plain}" ;;
+            *) echo -e "${red}  ⚠ Chỉ nhập 1, 2 hoặc 3!${plain}" ;;
         esac
     done
     
-    # Nếu 2 node
+    # ── Node 2 (nếu có) ──
     if [[ "$num_nodes" == "2" ]]; then
         echo ""
-        echo -e "${cyan}╔════════════════════════════════╗${plain}"
-        echo -e "${cyan}║  NODE 2 - Node ID              ║${plain}"
-        echo -e "${cyan}╚════════════════════════════════╝${plain}"
+        echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+        echo -e "${cyan}║  NODE 2 - THÔNG TIN                        ║${plain}"
+        echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
+        
         while true; do
-            echo -ne "${green}Node 2 ID: ${plain}"
+            echo -ne "${green}▶ Node 2 ID: ${plain}"
             read -r node2_id
             [[ "$node2_id" =~ ^[0-9]+$ ]] && break
-            echo -e "${red}Chỉ nhập số!${plain}"
+            echo -e "${red}  ⚠ Chỉ nhập số!${plain}"
         done
         
-        echo -e "${cyan}Loại node: 1) V2ray  2) Trojan  3) Shadowsocks${plain}"
+        echo ""
+        echo -e "${yellow}Chọn loại giao thức cho Node 2:${plain}"
+        echo -e "  ${cyan}1${plain} → VMESS / VLESS"
+        echo -e "  ${cyan}2${plain} → Trojan"
+        echo -e "  ${cyan}3${plain} → Shadowsocks"
+        
         while true; do
-            echo -ne "${green}Chọn [1-3]: ${plain}"
-            read -r n2_type
-            case "$n2_type" in
+            echo -ne "${green}▶ Chọn [1-3]: ${plain}"
+            read -r n2_choice
+            case "$n2_choice" in
                 1) node2_type="V2ray" ; break ;;
                 2) node2_type="Trojan" ; break ;;
                 3) node2_type="Shadowsocks" ; break ;;
-                *) echo -e "${red}Chỉ nhập 1-3!${plain}" ;;
+                *) echo -e "${red}  ⚠ Chỉ nhập 1, 2 hoặc 3!${plain}" ;;
             esac
         done
     fi
     
-    # Redis
+    # ── Redis ──
     echo ""
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  Bật Redis? (y/N)              ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
-    echo -ne "${green}[y/N]: ${plain}"
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  REDIS - GIỚI HẠN THIẾT BỊ                 ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
+    echo -ne "${green}▶ Bạn có Redis không? [y/N]: ${plain}"
     read -r redis_choice
     
     if [[ "$redis_choice" =~ ^[Yy] ]]; then
         redis_enabled="true"
-        echo -ne "${green}Redis Addr (127.0.0.1:6379): ${plain}"
+        
+        echo -ne "${green}▶ Redis Addr (127.0.0.1:6379): ${plain}"
         read -r redis_addr
         [[ -z "$redis_addr" ]] && redis_addr="127.0.0.1:6379"
         
-        echo -ne "${green}Redis Pass (Enter = rỗng): ${plain}"
+        echo -ne "${green}▶ Redis Password (Enter = không có): ${plain}"
         read -r redis_pass
+        
+        echo -ne "${green}▶ Redis DB [0]: ${plain}"
+        read -r redis_db
+        [[ -z "$redis_db" ]] && redis_db=0
     else
         redis_enabled="false"
     fi
 }
 
 #============================================================
+#  XEM LẠI CẤU HÌNH
+#============================================================
 review() {
     echo ""
-    echo -e "${cyan}╔════════════════════════════════╗${plain}"
-    echo -e "${cyan}║  XEM LẠI CẤU HÌNH              ║${plain}"
-    echo -e "${cyan}╚════════════════════════════════╝${plain}"
+    echo -e "${cyan}╔════════════════════════════════════════════╗${plain}"
+    echo -e "${cyan}║  XEM LẠI CẤU HÌNH                          ║${plain}"
+    echo -e "${cyan}╚════════════════════════════════════════════╝${plain}"
     echo ""
-    echo -e "${green}Panel:${plain} $panel_url"
-    echo -e "${green}API Key:${plain} ${api_key:0:15}..."
-    echo -e "${green}Node 1:${plain} ID=$node1_id, Type=$node1_type"
+    echo -e "${green}  Panel URL:${plain} $panel_url"
+    echo -e "${green}  API Key:${plain}   ${api_key:0:20}..."
+    echo ""
+    echo -e "${green}  Node 1:${plain}"
+    echo -e "    └─ ID: $node1_id"
+    echo -e "    └─ Giao thức: $node1_type"
     
     if [[ "$num_nodes" == "2" ]]; then
-        echo -e "${green}Node 2:${plain} ID=$node2_id, Type=$node2_type"
+        echo ""
+        echo -e "${green}  Node 2:${plain}"
+        echo -e "    └─ ID: $node2_id"
+        echo -e "    └─ Giao thức: $node2_type"
     fi
     
-    echo -e "${green}Redis:${plain} $redis_enabled"
+    echo ""
+    echo -e "${green}  Redis:${plain} $redis_enabled"
+    if [[ "$redis_enabled" == "true" ]]; then
+        echo -e "    └─ Địa chỉ: $redis_addr"
+        echo -e "    └─ DB: $redis_db"
+    fi
     
     echo ""
-    echo -ne "${green}Xác nhận? [y/N]: ${plain}"
+    echo -e "${cyan}════════════════════════════════════════════${plain}"
+    echo ""
+    echo -ne "${green}▶ Xác nhận cài đặt? [y/N]: ${plain}"
     read -r confirm
     [[ "$confirm" =~ ^[Yy] ]]
 }
 
 #============================================================
+#  GHI CONFIG - TẠO MULTI-NODE
+#============================================================
 write_config() {
-    echo -e "${blue}[*] Ghi config...${plain}"
+    echo ""
+    echo -e "${blue}[●] Tạo cấu hình...${plain}"
     
-    # Backup
-    cp "$XRAYR_CFG" "${XRAYR_CFG}.bak"
+    # Tạo config cơ bản cho Node 1
+    cat > "$XRAYR_CFG" <<'CONFIGEOF'
+Log:
+  Level: warning
+  AccessPath:
+  ErrorPath:
+
+DnsConfigPath:
+RouteConfigPath:
+InboundConfigPath:
+OutboundConfigPath:
+
+ConnectionConfig:
+  Handshake: 4
+  ConnIdle: 30
+  UplinkOnly: 2
+  DownlinkOnly: 4
+  BufferSize: 64
+
+Nodes:
+  - PanelType: "NewV2board"
+    ApiConfig:
+      ApiHost: "PANEL_URL_PLACEHOLDER"
+      ApiKey: "API_KEY_PLACEHOLDER"
+      NodeID: NODE1_ID_PLACEHOLDER
+      NodeType: NODE1_TYPE_PLACEHOLDER
+      Timeout: 30
+      EnableVless: false
+      VlessFlow: "xtls-rprx-vision"
+      SpeedLimit: 0
+      DeviceLimit: 0
+      RuleListPath:
+      DisableCustomConfig: false
+    ControllerConfig:
+      ListenIP: 0.0.0.0
+      SendIP: 0.0.0.0
+      UpdatePeriodic: 60
+      EnableDNS: false
+      DNSType: AsIs
+      EnableProxyProtocol: false
+      AutoSpeedLimitConfig:
+        Limit: 0
+        WarnTimes: 0
+        LimitSpeed: 0
+        LimitDuration: 0
+      GlobalDeviceLimitConfig:
+        Enable: REDIS_ENABLE_PLACEHOLDER
+        RedisNetwork: tcp
+        RedisAddr: REDIS_ADDR_PLACEHOLDER
+        RedisUsername:
+        RedisPassword: REDIS_PASS_PLACEHOLDER
+        RedisDB: REDIS_DB_PLACEHOLDER
+        Timeout: 5
+        Expiry: 60
+      CertConfig:
+        CertMode: none
+        CertDomain: ""
+        CertFile:
+        KeyFile:
+CONFIGEOF
+
+    # Thay thế placeholder cho Node 1
+    sed -i "s|PANEL_URL_PLACEHOLDER|$panel_url|g" "$XRAYR_CFG"
+    sed -i "s|API_KEY_PLACEHOLDER|$api_key|g" "$XRAYR_CFG"
+    sed -i "s|NODE1_ID_PLACEHOLDER|$node1_id|g" "$XRAYR_CFG"
+    sed -i "s|NODE1_TYPE_PLACEHOLDER|$node1_type|g" "$XRAYR_CFG"
     
-    # Thay thế Node 1
-    sed -i "s|PANEL_URL_1|$panel_url|g" "$XRAYR_CFG"
-    sed -i "s|API_KEY_1|$api_key|g" "$XRAYR_CFG"
-    sed -i "s|NodeID: 1|NodeID: $node1_id|" "$XRAYR_CFG"
-    sed -i "s|NodeType: V2ray|NodeType: $node1_type|" "$XRAYR_CFG"
+    # Redis
+    if [[ "$redis_enabled" == "true" ]]; then
+        sed -i "s|REDIS_ENABLE_PLACEHOLDER|true|g" "$XRAYR_CFG"
+        sed -i "s|REDIS_ADDR_PLACEHOLDER|$redis_addr|g" "$XRAYR_CFG"
+        sed -i "s|REDIS_PASS_PLACEHOLDER|$redis_pass|g" "$XRAYR_CFG"
+        sed -i "s|REDIS_DB_PLACEHOLDER|$redis_db|g" "$XRAYR_CFG"
+    else
+        sed -i "s|REDIS_ENABLE_PLACEHOLDER|false|g" "$XRAYR_CFG"
+        sed -i "s|REDIS_ADDR_PLACEHOLDER|127.0.0.1:6379|g" "$XRAYR_CFG"
+        sed -i "s|REDIS_PASS_PLACEHOLDER||g" "$XRAYR_CFG"
+        sed -i "s|REDIS_DB_PLACEHOLDER|0|g" "$XRAYR_CFG"
+    fi
     
-    # Nếu 2 node - thêm node 2 vào cuối file
+    # Nếu có Node 2, append vào cuối file
     if [[ "$num_nodes" == "2" ]]; then
+        echo -e "${blue}[●] Thêm Node 2...${plain}"
+        
+        # Redis DB cho node 2 (khác node 1)
+        local node2_redis_db=$((redis_db + 1))
+        
         cat >> "$XRAYR_CFG" <<EOF
 
   - PanelType: "NewV2board"
@@ -324,92 +500,66 @@ write_config() {
         LimitSpeed: 0
         LimitDuration: 0
       GlobalDeviceLimitConfig:
-        Enable: false
+        Enable: $redis_enabled
         RedisNetwork: tcp
-        RedisAddr: 127.0.0.1:6379
+        RedisAddr: $redis_addr
         RedisUsername:
-        RedisPassword:
-        RedisDB: 1
+        RedisPassword: $redis_pass
+        RedisDB: $node2_redis_db
         Timeout: 5
         Expiry: 60
-      EnableFallback: false
-      FallBackConfigs:
-        - SNI:
-          Alpn:
-          Path:
-          Dest: 80
-          ProxyProtocolVer: 0
-      DisableLocalREALITYConfig: false
-      EnableREALITY: false
-      REALITYConfigs:
-        Show: true
-        Dest: www.amazon.com:443
-        ProxyProtocolVer: 0
-        ServerNames:
-          - www.amazon.com
-        PrivateKey: YOUR_PRIVATE_KEY
-        MinClientVer:
-        MaxClientVer:
-        MaxTimeDiff: 0
-        ShortIds:
-          - ""
-          - 0123456789abcdef
       CertConfig:
         CertMode: none
         CertDomain: ""
         CertFile:
         KeyFile:
-        Provider: alidns
-        Email:
-        DNSEnv:
-          ALICLOUD_ACCESS_KEY:
-          ALICLOUD_SECRET_KEY:
 EOF
     fi
     
-    # Redis
-    if [[ "$redis_enabled" == "true" ]]; then
-        sed -i "s|Enable: false|Enable: true|g" "$XRAYR_CFG"
-        sed -i "s|RedisAddr: 127.0.0.1:6379|RedisAddr: $redis_addr|g" "$XRAYR_CFG"
-        if [[ -n "$redis_pass" ]]; then
-            sed -i "s|RedisPassword:|RedisPassword: $redis_pass|g" "$XRAYR_CFG"
-        fi
-    fi
-    
-    echo -e "${green}[✓] Config đã ghi${plain}"
+    echo -e "${green}[✓] Config đã tạo${plain}"
 }
 
+#============================================================
+#  TẠO SYSTEMD SERVICE
+#============================================================
 create_service() {
-    echo -e "${blue}[*] Tạo service...${plain}"
+    echo -e "${blue}[●] Tạo systemd service...${plain}"
+    
     cat > "$XRAYR_SVC" <<EOF
 [Unit]
-Description=XrayR Multi-Node
-After=network.target
+Description=XrayR Multi-Node Service
+Documentation=https://github.com/XrayR-project/XrayR
+After=network.target nss-lookup.target
 
 [Service]
 Type=simple
 User=root
 ExecStart=$XRAYR_BIN --config $XRAYR_CFG
-Restart=always
+Restart=on-failure
 RestartSec=3
 LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 EOF
+    
     systemctl daemon-reload
-    echo -e "${green}[✓] Service OK${plain}"
+    echo -e "${green}[✓] Service đã tạo${plain}"
 }
 
 #============================================================
+#  CÀI ĐẶT (MAIN FLOW)
+#============================================================
 do_install() {
     header
-    echo -e "${bold}${cyan}── CÀI ĐẶT ──${plain}"
+    echo -e "${bold}${cyan}╔══════════════════════════════════════════════════════╗${plain}"
+    echo -e "${bold}${cyan}║                 CÀI ĐẶT XrayR                        ║${plain}"
+    echo -e "${bold}${cyan}╚══════════════════════════════════════════════════════╝${plain}"
     echo ""
     
     if is_installed; then
-        echo -e "${yellow}Đã cài rồi. Cài lại?${plain}"
-        echo -ne "${green}[y/N]: ${plain}"
+        echo -e "${yellow}⚠ Đã cài rồi. Cài lại sẽ xóa hết cấu hình cũ.${plain}"
+        echo -ne "${green}▶ Tiếp tục? [y/N]: ${plain}"
         read -r ov
         [[ ! "$ov" =~ ^[Yy] ]] && return
     fi
@@ -418,106 +568,199 @@ do_install() {
     detect_arch
     install_deps
     disable_fw
+    cleanup_old
     install_binary || { wait_key ; return ; }
-    download_config || { wait_key ; return ; }
     
     input_all_info
-    review || { echo -e "${yellow}Hủy${plain}" ; wait_key ; return ; }
+    review || { echo -e "${yellow}\n[—] Hủy cài đặt.${plain}" ; wait_key ; return ; }
     
     write_config
     create_service
     
+    # Khởi động
     echo ""
-    echo -e "${blue}[*] Khởi động...${plain}"
+    echo -e "${blue}[●] Khởi động XrayR...${plain}"
     systemctl enable XrayR &>/dev/null
     systemctl start XrayR
-    sleep 2
+    sleep 3
     
+    echo ""
     if systemctl is-active --quiet XrayR; then
-        echo -e "${green}${bold}[✓] Chạy thành công!${plain}"
+        echo -e "${green}${bold}╔══════════════════════════════════════════════════════╗${plain}"
+        echo -e "${green}${bold}║          ✓ CÀI ĐẶT THÀNH CÔNG!                       ║${plain}"
+        echo -e "${green}${bold}╚══════════════════════════════════════════════════════╝${plain}"
+        echo ""
+        echo -e "${green}XrayR đang chạy và tự đồng bộ với V2Board.${plain}"
+        
+        if [[ "$num_nodes" == "2" ]]; then
+            echo -e "${cyan}→ Đã cài 2 nodes: ID $node1_id và $node2_id${plain}"
+        else
+            echo -e "${cyan}→ Đã cài 1 node: ID $node1_id${plain}"
+        fi
     else
-        echo -e "${red}[✗] Lỗi. Xem log: journalctl -u XrayR -n 50${plain}"
+        echo -e "${red}╔══════════════════════════════════════════════════════╗${plain}"
+        echo -e "${red}║          ✗ LỖI KHI KHỞI ĐỘNG                         ║${plain}"
+        echo -e "${red}╚══════════════════════════════════════════════════════╝${plain}"
+        echo ""
+        echo -e "${yellow}Xem log lỗi:${plain}"
+        echo -e "${cyan}  journalctl -u XrayR -n 50 --no-pager${plain}"
     fi
     
     wait_key
 }
 
+#============================================================
+#  GỠ CÀI ĐẶT
+#============================================================
 do_uninstall() {
     header
-    echo -e "${bold}${red}── GỠ CÀI ĐẶT ──${plain}"
+    echo -e "${bold}${red}╔══════════════════════════════════════════════════════╗${plain}"
+    echo -e "${bold}${red}║              GỠ CÀI ĐẶT XrayR                        ║${plain}"
+    echo -e "${bold}${red}╚══════════════════════════════════════════════════════╝${plain}"
     echo ""
     
     if ! is_installed; then
-        echo -e "${yellow}Chưa cài đặt${plain}"
+        echo -e "${yellow}⚠ XrayR chưa được cài đặt.${plain}"
         wait_key
         return
     fi
     
-    echo -ne "${green}Xác nhận? [y/N]: ${plain}"
+    echo -e "${red}Sẽ xóa:${plain}"
+    echo -e "  • $XRAYR_DIR"
+    echo -e "  • /etc/XrayR"
+    echo -e "  • Systemd service"
+    echo ""
+    echo -ne "${green}▶ Xác nhận gỡ cài đặt? [y/N]: ${plain}"
     read -r yn
-    [[ ! "$yn" =~ ^[Yy] ]] && return
     
+    [[ ! "$yn" =~ ^[Yy] ]] && { echo -e "${yellow}[—] Hủy${plain}" ; return ; }
+    
+    echo ""
+    echo -e "${blue}[●] Đang gỡ...${plain}"
     systemctl stop XrayR 2>/dev/null
     systemctl disable XrayR 2>/dev/null
     rm -rf "$XRAYR_DIR" /etc/XrayR "$XRAYR_SVC"
-    systemctl daemon-reload
+    systemctl daemon-reload 2>/dev/null
     
-    echo -e "${green}[✓] Đã gỡ${plain}"
+    echo -e "${green}[✓] Đã gỡ hoàn toàn.${plain}"
     wait_key
 }
 
+#============================================================
+#  QUẢN LÝ
+#============================================================
 do_manage() {
     while true; do
         header
-        echo -e "${bold}${cyan}── QUẢN LÝ ──${plain}"
+        echo -e "${bold}${cyan}╔══════════════════════════════════════════════════════╗${plain}"
+        echo -e "${bold}${cyan}║                  QUẢN LÝ XrayR                       ║${plain}"
+        echo -e "${bold}${cyan}╚══════════════════════════════════════════════════════╝${plain}"
         echo ""
-        echo -e "  ${cyan}1${plain}  Start      ${cyan}4${plain}  Status"
-        echo -e "  ${cyan}2${plain}  Stop       ${cyan}5${plain}  Logs"
-        echo -e "  ${cyan}3${plain}  Restart    ${cyan}6${plain}  Edit config"
-        echo -e "  ${cyan}0${plain}  Quay về"
+        echo -e "  ${cyan}1${plain}  Khởi động         ${cyan}4${plain}  Xem trạng thái"
+        echo -e "  ${cyan}2${plain}  Dừng              ${cyan}5${plain}  Xem log"
+        echo -e "  ${cyan}3${plain}  Khởi động lại     ${cyan}6${plain}  Sửa config.yml"
         echo ""
-        echo -ne "${green}Chọn: ${plain}"
+        echo -e "  ${cyan}0${plain}  Quay về menu chính"
+        echo ""
+        echo -ne "${green}▶ Chọn: ${plain}"
         read -r m
         
         case "$m" in
-            1) systemctl start XrayR && echo -e "${green}OK${plain}" || echo -e "${red}Lỗi${plain}" ; wait_key ;;
-            2) systemctl stop XrayR && echo -e "${green}OK${plain}" ; wait_key ;;
-            3) systemctl restart XrayR && echo -e "${green}OK${plain}" || echo -e "${red}Lỗi${plain}" ; wait_key ;;
-            4) systemctl status XrayR --no-pager ; wait_key ;;
-            5) journalctl -u XrayR -n 100 --no-pager ; wait_key ;;
+            1)
+                systemctl start XrayR
+                if systemctl is-active --quiet XrayR; then
+                    echo -e "${green}[✓] Đã khởi động${plain}"
+                else
+                    echo -e "${red}[✗] Khởi động thất bại${plain}"
+                fi
+                wait_key
+                ;;
+            2)
+                systemctl stop XrayR && echo -e "${green}[✓] Đã dừng${plain}"
+                wait_key
+                ;;
+            3)
+                systemctl restart XrayR
+                if systemctl is-active --quiet XrayR; then
+                    echo -e "${green}[✓] Đã khởi động lại${plain}"
+                else
+                    echo -e "${red}[✗] Khởi động lại thất bại${plain}"
+                fi
+                wait_key
+                ;;
+            4)
+                echo ""
+                systemctl status XrayR --no-pager
+                wait_key
+                ;;
+            5)
+                echo ""
+                echo -e "${cyan}═══ LOG (100 dòng gần nhất) ═══${plain}"
+                journalctl -u XrayR -n 100 --no-pager
+                wait_key
+                ;;
             6)
-                nano "$XRAYR_CFG" || vi "$XRAYR_CFG"
-                echo -ne "${green}Restart? [y/N]: ${plain}"
+                echo ""
+                echo -e "${blue}[●] Mở config.yml...${plain}"
+                command -v nano &>/dev/null && nano "$XRAYR_CFG" || vi "$XRAYR_CFG"
+                
+                echo ""
+                echo -ne "${green}▶ Khởi động lại để áp dụng? [y/N]: ${plain}"
                 read -r rr
-                [[ "$rr" =~ ^[Yy] ]] && systemctl restart XrayR
+                
+                if [[ "$rr" =~ ^[Yy] ]]; then
+                    systemctl restart XrayR
+                    if systemctl is-active --quiet XrayR; then
+                        echo -e "${green}[✓] Đã khởi động lại${plain}"
+                    else
+                        echo -e "${red}[✗] Khởi động lại thất bại — kiểm tra config${plain}"
+                    fi
+                fi
                 wait_key
                 ;;
             0) return ;;
-            *) echo -e "${red}0-6 thôi!${plain}" ; wait_key ;;
+            *)
+                echo -e "${red}⚠ Chọn từ 0-6 thôi!${plain}"
+                sleep 1
+                ;;
         esac
     done
 }
 
+#============================================================
+#  MENU CHÍNH
+#============================================================
 main() {
     check_root
+    
     while true; do
         header
-        echo -e "${cyan}  ┌─────────────────────────┐${plain}"
-        echo -e "${cyan}  │  1  Cài đặt             │${plain}"
-        echo -e "${cyan}  │  2  Quản lý             │${plain}"
-        echo -e "${cyan}  │  3  Gỡ cài đặt          │${plain}"
-        echo -e "${cyan}  │  0  Thoát               │${plain}"
-        echo -e "${cyan}  └─────────────────────────┘${plain}"
+        echo -e "${cyan}╔══════════════════════════════════════════════════════╗${plain}"
+        echo -e "${cyan}║                                                      ║${plain}"
+        echo -e "${cyan}║  ${bold}1${plain}  ${cyan}Cài đặt XrayR                                   ${cyan}║${plain}"
+        echo -e "${cyan}║  ${bold}2${plain}  ${cyan}Quản lý XrayR                                   ${cyan}║${plain}"
+        echo -e "${cyan}║  ${bold}3${plain}  ${cyan}Gỡ cài đặt XrayR                                ${cyan}║${plain}"
+        echo -e "${cyan}║  ${bold}0${plain}  ${cyan}Thoát                                           ${cyan}║${plain}"
+        echo -e "${cyan}║                                                      ║${plain}"
+        echo -e "${cyan}╚══════════════════════════════════════════════════════╝${plain}"
         echo ""
-        echo -ne "${green}Chọn: ${plain}"
+        echo -ne "${green}▶ Chọn: ${plain}"
         read -r opt
         
         case "$opt" in
             1) do_install ;;
             2) do_manage ;;
             3) do_uninstall ;;
-            0) echo -e "${green}Bye!${plain}" ; exit 0 ;;
-            *) ;;
+            0)
+                echo ""
+                echo -e "${green}Tạm biệt! 👋${plain}"
+                echo ""
+                exit 0
+                ;;
+            *)
+                echo -e "${red}⚠ Chọn từ 0-3 thôi!${plain}"
+                sleep 1
+                ;;
         esac
     done
 }
