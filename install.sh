@@ -108,6 +108,58 @@ disable_fw() {
 }
 
 #============================================================
+#  DỌN DẸP CÀI ĐẶT CŨ
+#============================================================
+cleanup_old_install() {
+    echo -e "${blue}[*] Kiểm tra cài đặt cũ...${plain}"
+    
+    local cleaned=false
+    
+    # Stop service cũ nếu đang chạy
+    if systemctl is-active --quiet XrayR 2>/dev/null; then
+        echo -e "${yellow}[!] Dừng XrayR đang chạy...${plain}"
+        systemctl stop XrayR 2>/dev/null
+        cleaned=true
+    fi
+    
+    # Xóa config cũ (có thể chứa URL download lỗi)
+    if [[ -f "$XRAYR_CFG" ]]; then
+        echo -e "${yellow}[!] Xóa config.yml cũ...${plain}"
+        rm -f "$XRAYR_CFG"
+        cleaned=true
+    fi
+    
+    # Xóa binary cũ
+    if [[ -f "$XRAYR_BIN" ]]; then
+        echo -e "${yellow}[!] Xóa binary cũ...${plain}"
+        rm -f "$XRAYR_BIN"
+        cleaned=true
+    fi
+    
+    # Xóa service cũ
+    if [[ -f "$XRAYR_SVC" ]]; then
+        echo -e "${yellow}[!] Xóa service cũ...${plain}"
+        systemctl disable XrayR 2>/dev/null
+        rm -f "$XRAYR_SVC"
+        systemctl daemon-reload 2>/dev/null
+        cleaned=true
+    fi
+    
+    # Xóa toàn bộ thư mục XrayR (kể cả file zip/config cũ)
+    if [[ -d "$XRAYR_DIR" ]]; then
+        echo -e "${yellow}[!] Xóa thư mục cũ $XRAYR_DIR...${plain}"
+        rm -rf "$XRAYR_DIR"
+        cleaned=true
+    fi
+    
+    if [[ "$cleaned" == true ]]; then
+        echo -e "${green}[✓] Đã dọn dẹp cài đặt cũ${plain}"
+    else
+        echo -e "${green}[✓] Không có cài đặt cũ${plain}"
+    fi
+}
+
+#============================================================
 #  TẢI XrayR — LINK CỐ ĐỊNH + 3 MIRROR
 #============================================================
 install_binary() {
@@ -459,6 +511,7 @@ do_install() {
     detect_arch
     install_deps
     disable_fw
+    cleanup_old_install      # ← Xóa cài đặt cũ trước
     install_binary       || { wait_key ; return ; }
 
     input_api_host
