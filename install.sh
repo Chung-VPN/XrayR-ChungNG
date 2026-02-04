@@ -262,18 +262,20 @@ input_all_info() {
     
     echo ""
     echo -e "${yellow}Chọn loại giao thức cho Node 1:${plain}"
-    echo -e "  ${cyan}1${plain} → VMESS / VLESS"
-    echo -e "  ${cyan}2${plain} → Trojan"
-    echo -e "  ${cyan}3${plain} → Shadowsocks"
+    echo -e "  ${cyan}1${plain} → VMESS"
+    echo -e "  ${cyan}2${plain} → VLESS"
+    echo -e "  ${cyan}3${plain} → Trojan"
+    echo -e "  ${cyan}4${plain} → Shadowsocks"
     
     while true; do
-        echo -ne "${green}▶ Chọn [1-3]: ${plain}"
+        echo -ne "${green}▶ Chọn [1-4]: ${plain}"
         read -r n1_choice
         case "$n1_choice" in
-            1) node1_type="V2ray" ; break ;;
-            2) node1_type="Trojan" ; break ;;
-            3) node1_type="Shadowsocks" ; break ;;
-            *) echo -e "${red}  ⚠ Chỉ nhập 1, 2 hoặc 3!${plain}" ;;
+            1) node1_type="V2ray" ; node1_vless="false" ; break ;;
+            2) node1_type="V2ray" ; node1_vless="true" ; break ;;
+            3) node1_type="Trojan" ; node1_vless="false" ; break ;;
+            4) node1_type="Shadowsocks" ; node1_vless="false" ; break ;;
+            *) echo -e "${red}  ⚠ Chỉ nhập 1, 2, 3 hoặc 4!${plain}" ;;
         esac
     done
     
@@ -293,18 +295,20 @@ input_all_info() {
         
         echo ""
         echo -e "${yellow}Chọn loại giao thức cho Node 2:${plain}"
-        echo -e "  ${cyan}1${plain} → VMESS / VLESS"
-        echo -e "  ${cyan}2${plain} → Trojan"
-        echo -e "  ${cyan}3${plain} → Shadowsocks"
+        echo -e "  ${cyan}1${plain} → VMESS"
+        echo -e "  ${cyan}2${plain} → VLESS"
+        echo -e "  ${cyan}3${plain} → Trojan"
+        echo -e "  ${cyan}4${plain} → Shadowsocks"
         
         while true; do
-            echo -ne "${green}▶ Chọn [1-3]: ${plain}"
+            echo -ne "${green}▶ Chọn [1-4]: ${plain}"
             read -r n2_choice
             case "$n2_choice" in
-                1) node2_type="V2ray" ; break ;;
-                2) node2_type="Trojan" ; break ;;
-                3) node2_type="Shadowsocks" ; break ;;
-                *) echo -e "${red}  ⚠ Chỉ nhập 1, 2 hoặc 3!${plain}" ;;
+                1) node2_type="V2ray" ; node2_vless="false" ; break ;;
+                2) node2_type="V2ray" ; node2_vless="true" ; break ;;
+                3) node2_type="Trojan" ; node2_vless="false" ; break ;;
+                4) node2_type="Shadowsocks" ; node2_vless="false" ; break ;;
+                *) echo -e "${red}  ⚠ Chỉ nhập 1, 2, 3 hoặc 4!${plain}" ;;
             esac
         done
     fi
@@ -349,13 +353,25 @@ review() {
     echo ""
     echo -e "${green}  Node 1:${plain}"
     echo -e "    └─ ID: $node1_id"
-    echo -e "    └─ Giao thức: $node1_type"
+    if [[ "$node1_type" == "V2ray" && "$node1_vless" == "true" ]]; then
+        echo -e "    └─ Giao thức: VLESS"
+    elif [[ "$node1_type" == "V2ray" ]]; then
+        echo -e "    └─ Giao thức: VMESS"
+    else
+        echo -e "    └─ Giao thức: $node1_type"
+    fi
     
     if [[ "$num_nodes" == "2" ]]; then
         echo ""
         echo -e "${green}  Node 2:${plain}"
         echo -e "    └─ ID: $node2_id"
-        echo -e "    └─ Giao thức: $node2_type"
+        if [[ "$node2_type" == "V2ray" && "$node2_vless" == "true" ]]; then
+            echo -e "    └─ Giao thức: VLESS"
+        elif [[ "$node2_type" == "V2ray" ]]; then
+            echo -e "    └─ Giao thức: VMESS"
+        else
+            echo -e "    └─ Giao thức: $node2_type"
+        fi
     fi
     
     echo ""
@@ -407,7 +423,7 @@ Nodes:
       NodeID: NODE1_ID_PLACEHOLDER
       NodeType: NODE1_TYPE_PLACEHOLDER
       Timeout: 30
-      EnableVless: false
+      EnableVless: NODE1_VLESS_PLACEHOLDER
       VlessFlow: "xtls-rprx-vision"
       SpeedLimit: 0
       DeviceLimit: 0
@@ -446,6 +462,7 @@ CONFIGEOF
     sed -i "s|API_KEY_PLACEHOLDER|$api_key|g" "$XRAYR_CFG"
     sed -i "s|NODE1_ID_PLACEHOLDER|$node1_id|g" "$XRAYR_CFG"
     sed -i "s|NODE1_TYPE_PLACEHOLDER|$node1_type|g" "$XRAYR_CFG"
+    sed -i "s|NODE1_VLESS_PLACEHOLDER|$node1_vless|g" "$XRAYR_CFG"
     
     # Redis
     if [[ "$redis_enabled" == "true" ]]; then
@@ -476,7 +493,7 @@ CONFIGEOF
       NodeID: $node2_id
       NodeType: $node2_type
       Timeout: 30
-      EnableVless: false
+      EnableVless: $node2_vless
       VlessFlow: "xtls-rprx-vision"
       SpeedLimit: 0
       DeviceLimit: 0
