@@ -1,9 +1,4 @@
 #!/bin/bash
-#============================================================
-#   XrayR Multi-Node Installer — V2Board
-#   Hỗ trợ: 1-2 nodes cùng lúc
-#   Cách dùng: bash <(curl -Ls YOUR_URL/install.sh)
-#============================================================
 
 red='\033[0;31m'
 green='\033[0;32m'
@@ -59,7 +54,7 @@ header() {
     clear
     echo -e "${cyan}╔══════════════════════════════════════════════════════╗${plain}"
     echo -e "${cyan}║                                                      ║${plain}"
-    echo -e "${cyan}║${plain}    ${bold}${green}XrayR Multi-Node Installer — V2Board${plain}       ${cyan}║${plain}"
+    echo -e "${cyan}║${plain}    ${bold}${green}XrayR - ChungVPN — V2Board${plain}       ${cyan}║${plain}"
     echo -e "${cyan}║                                                      ║${plain}"
     echo -e "${cyan}╚══════════════════════════════════════════════════════╝${plain}"
     
