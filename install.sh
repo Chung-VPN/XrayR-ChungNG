@@ -67,7 +67,7 @@ svc_badge() {
 header() {
     clear
     echo -e "${cyan}============================================================${plain}"
-    echo -e "${bold}${green}    XrayR Tự-Cài — V2Board (2 NODE / 1 VPS)${plain}"
+    echo -e "${bold}${green}    XrayR Tự-Cài — V2Board (1-2 NODE / 1 VPS)${plain}"
     echo -e "${cyan}============================================================${plain}"
     svc_badge
     echo ""
@@ -329,7 +329,6 @@ input_redis() {
         
         echo -ne "${green}Redis Password (bỏ trống nếu không có): ${plain}"
         read -r redis_pass
-        [[ -z "$redis_pass" ]] && redis_pass='""'
         
         echo -ne "${green}Redis Timeout (giây, mặc định 5): ${plain}"
         read -r redis_timeout
@@ -352,16 +351,14 @@ review() {
     echo -e "${cyan}║         XEM LẠI CẤU HÌNH                  ║${plain}"
     echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
     
-    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node1" ]]; then
-        echo ""
-        echo -e "${bold}${green}NODE 1:${plain}"
-        echo -e "  Panel URL:  ${cyan}$api_host_node1${plain}"
-        echo -e "  API Key:    ${cyan}${api_key_node1:0:20}...${plain}"
-        echo -e "  Node ID:    ${cyan}$node_id_node1${plain}"
-        echo -e "  Node Type:  ${cyan}$node_type_node1${plain}"
-    fi
+    echo ""
+    echo -e "${bold}${green}NODE 1:${plain}"
+    echo -e "  Panel URL:  ${cyan}$api_host_node1${plain}"
+    echo -e "  API Key:    ${cyan}${api_key_node1:0:20}...${plain}"
+    echo -e "  Node ID:    ${cyan}$node_id_node1${plain}"
+    echo -e "  Node Type:  ${cyan}$node_type_node1${plain}"
     
-    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node2" ]]; then
+    if [[ "$num_nodes" == "2" ]]; then
         echo ""
         echo -e "${bold}${green}NODE 2:${plain}"
         echo -e "  Panel URL:  ${cyan}$api_host_node2${plain}"
@@ -397,55 +394,35 @@ patch_config() {
     # Backup
     cp "$XRAYR_CFG" "$XRAYR_CFG.backup"
     
-    # Cập nhật Node 1 (node đầu tiên trong file)
-    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node1" ]]; then
-        # Tìm dòng đầu tiên của Node 1 (YOUR_PANEL_URL_NODE1)
-        sed -i "0,/YOUR_PANEL_URL_NODE1/s|YOUR_PANEL_URL_NODE1|$api_host_node1|" "$XRAYR_CFG"
-        sed -i "0,/YOUR_API_KEY_NODE1/s|YOUR_API_KEY_NODE1|$api_key_node1|" "$XRAYR_CFG"
-        
-        # Tìm NodeID và NodeType đầu tiên (của Node 1)
-        sed -i "0,/NodeID: 1/s|NodeID: 1|NodeID: $node_id_node1|" "$XRAYR_CFG"
-        sed -i "0,/NodeType: V2ray/s|NodeType: V2ray|NodeType: $node_type_node1|" "$XRAYR_CFG"
-    fi
+    # Cập nhật Node 1
+    sed -i "s|YOUR_PANEL_URL_NODE1|$api_host_node1|g" "$XRAYR_CFG"
+    sed -i "s|YOUR_API_KEY_NODE1|$api_key_node1|g" "$XRAYR_CFG"
+    sed -i "0,/NodeID: 1/s|NodeID: 1|NodeID: $node_id_node1|" "$XRAYR_CFG"
+    sed -i "0,/NodeType: V2ray/s|NodeType: V2ray|NodeType: $node_type_node1|" "$XRAYR_CFG"
     
-    # Cập nhật Node 2 (node thứ hai trong file)
-    if [[ "$install_mode" == "both" ]] || [[ "$install_mode" == "node2" ]]; then
-        # Tìm dòng thứ hai của Node 2 (YOUR_PANEL_URL_NODE2)
-        sed -i "0,/YOUR_PANEL_URL_NODE2/s|YOUR_PANEL_URL_NODE2|$api_host_node2|" "$XRAYR_CFG"
-        sed -i "0,/YOUR_API_KEY_NODE2/s|YOUR_API_KEY_NODE2|$api_key_node2|" "$XRAYR_CFG"
+    # Nếu cài 2 node: bỏ comment và cập nhật Node 2
+    if [[ "$num_nodes" == "2" ]]; then
+        # Bỏ comment (dấu #) ở đầu các dòng của Node 2
+        sed -i '/# ====== NODE 2 ======/,$ s/^#//' "$XRAYR_CFG"
         
-        # Tìm NodeID và NodeType thứ hai (của Node 2)
+        # Cập nhật thông tin Node 2
+        sed -i "s|YOUR_PANEL_URL_NODE2|$api_host_node2|g" "$XRAYR_CFG"
+        sed -i "s|YOUR_API_KEY_NODE2|$api_key_node2|g" "$XRAYR_CFG"
         sed -i "0,/NodeID: 2/s|NodeID: 2|NodeID: $node_id_node2|" "$XRAYR_CFG"
         sed -i "0,/NodeType: Trojan/s|NodeType: Trojan|NodeType: $node_type_node2|" "$XRAYR_CFG"
     fi
     
-    # Cập nhật Redis cho cả 2 node nếu bật
+    # Cập nhật Redis nếu bật
     if [[ "$redis_on" == "true" ]]; then
-        # Enable Redis cho Node 1 (lần xuất hiện đầu tiên)
-        sed -i "0,/Enable: false.*# ← Script/s|Enable: false.*# ← Script.*|Enable: true                     # ← Script tự đổi thành true nếu enable Redis|" "$XRAYR_CFG"
-        # Enable Redis cho Node 2 (lần xuất hiện thứ hai)
-        sed -i "0,/Enable: false.*# ← Script/s|Enable: false.*# ← Script.*|Enable: true                     # ← Script tự đổi thành true nếu enable Redis|" "$XRAYR_CFG"
+        sed -i "s|Enable: false|Enable: true|g" "$XRAYR_CFG"
+        sed -i "s|RedisAddr: 127.0.0.1:6379|RedisAddr: $redis_addr|g" "$XRAYR_CFG"
         
-        # Cập nhật RedisAddr, RedisPassword, v.v. cho cả 2 node
-        sed -i "s|RedisAddr: 127.0.0.1:6379.*|RedisAddr: $redis_addr|g" "$XRAYR_CFG"
-        
-        if [[ "$redis_pass" != '""' ]]; then
-            sed -i "s|RedisPassword:.*# ← Script|RedisPassword: $redis_pass       # ← Script|g" "$XRAYR_CFG"
+        if [[ -n "$redis_pass" ]]; then
+            sed -i "s|RedisPassword:|RedisPassword: $redis_pass|g" "$XRAYR_CFG"
         fi
         
-        sed -i "s|Timeout: 5.*# ← Script|Timeout: $redis_timeout                        # ← Script|g" "$XRAYR_CFG"
-        sed -i "s|Expiry: 60.*# ← Script|Expiry: $redis_expiry                        # ← Script|g" "$XRAYR_CFG"
-    fi
-    
-    # Xóa node không dùng
-    if [[ "$install_mode" == "node1" ]]; then
-        # Xóa Node 2 khỏi config
-        sed -i '/# ====== NODE 2 ======/,$ d' "$XRAYR_CFG"
-    elif [[ "$install_mode" == "node2" ]]; then
-        # Xóa Node 1, giữ Node 2
-        # Tìm dòng "# ====== NODE 2 ======" và xóa từ "Nodes:" đến trước dòng này
-        awk '/# ====== NODE 2 ======/{flag=1} flag; !flag && /^Nodes:/{print; getline; next}' "$XRAYR_CFG" > "$XRAYR_CFG.tmp"
-        mv "$XRAYR_CFG.tmp" "$XRAYR_CFG"
+        sed -i "s|Timeout: 5|Timeout: $redis_timeout|g" "$XRAYR_CFG"
+        sed -i "s|Expiry: 60|Expiry: $redis_expiry|g" "$XRAYR_CFG"
     fi
     
     echo -e "${green}[✓] Ghi xong${plain}"
@@ -492,25 +469,20 @@ do_install() {
         echo ""
     fi
 
-    # Chọn chế độ cài đặt
+    # Chọn số lượng node
     echo -e "${cyan}╔═══════════════════════════════════════════╗${plain}"
-    echo -e "${cyan}║       CHỌN CHẾ ĐỘ CÀI ĐẶT                ║${plain}"
+    echo -e "${cyan}║       CHỌN SỐ LƯỢNG NODE                  ║${plain}"
     echo -e "${cyan}╚═══════════════════════════════════════════╝${plain}"
     echo ""
-    echo -e "  ${green}1${plain}  Cài cả 2 node (Node 1 + Node 2)"
-    echo -e "  ${green}2${plain}  Chỉ cài Node 1"
-    echo -e "  ${green}3${plain}  Chỉ cài Node 2"
+    echo -e "  ${green}1${plain}  Cài 1 node"
+    echo -e "  ${green}2${plain}  Cài 2 node"
     echo ""
     
     while true; do
-        echo -ne "${green}  Chọn [1-3]: ${plain}"
-        read -r mode_choice
-        case "$mode_choice" in
-            1) install_mode="both" ; break ;;
-            2) install_mode="node1" ; break ;;
-            3) install_mode="node2" ; break ;;
-            *) echo -e "${red}  [!] Chỉ nhập 1, 2 hoặc 3${plain}" ;;
-        esac
+        echo -ne "${green}  Chọn [1-2]: ${plain}"
+        read -r num_nodes
+        [[ "$num_nodes" == "1" ]] || [[ "$num_nodes" == "2" ]] && break
+        echo -e "${red}  [!] Chỉ nhập 1 hoặc 2${plain}"
     done
 
     detect_os
@@ -520,13 +492,11 @@ do_install() {
     install_binary       || { wait_key ; return ; }
     download_config      || { wait_key ; return ; }
 
-    # Nhập thông tin cho từng node
-    if [[ "$install_mode" == "both" ]]; then
-        input_node_config 1
-        input_node_config 2
-    elif [[ "$install_mode" == "node1" ]]; then
-        input_node_config 1
-    else
+    # Nhập thông tin cho node 1
+    input_node_config 1
+    
+    # Nếu chọn 2 node, nhập thông tin cho node 2
+    if [[ "$num_nodes" == "2" ]]; then
         input_node_config 2
     fi
     
@@ -545,7 +515,7 @@ do_install() {
 
     if systemctl is-active --quiet XrayR; then
         echo -e "${green}${bold}[✓✓] XrayR đang chạy thành công!${plain}"
-        if [[ "$install_mode" == "both" ]]; then
+        if [[ "$num_nodes" == "2" ]]; then
             echo -e "${green}     Cả 2 node sẽ tự đồng bộ với V2Board panel trong vài giây.${plain}"
         else
             echo -e "${green}     Node sẽ tự đồng bộ với V2Board panel trong vài giây.${plain}"
@@ -630,13 +600,8 @@ do_manage() {
                 wait_key ;;
             5)
                 echo ""
-                if [[ -f /var/log/XrayR/error.log ]]; then
-                    echo -e "${yellow}── Nội dung lỗi (error.log) ──${plain}"
-                    tail -n 80 /var/log/XrayR/error.log
-                else
-                    echo -e "${yellow}── Thông tin từ systemd ──${plain}"
-                    journalctl -u XrayR --no-pager -n 80
-                fi
+                echo -e "${yellow}── 100 dòng log gần nhất ──${plain}"
+                journalctl -u XrayR --no-pager -n 100
                 wait_key ;;
             6)
                 echo ""
