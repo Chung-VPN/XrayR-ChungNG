@@ -19,9 +19,7 @@ XRAYR_BIN="$XRAYR_DIR/XrayR"
 XRAYR_CFG="/etc/XrayR/config.yml"
 XRAYR_SVC="/etc/systemd/system/XrayR.service"
 
-# ── QUAN TRỌNG ──────────────────────────────────────────
-# Thay YOUR_USERNAME / YOUR_REPO bằng GitHub của bạn.
-CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO@main/config.yml"
+CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG@main/config.yml"
 
 #============================================================
 #  TIỆN ÍCH
