@@ -2,7 +2,7 @@
 #============================================================
 #   XrayR Tự-Cài — V2Board
 #   Cách dùng:
-#     bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install.sh)
+#     bash <(curl -Ls https://YOUR_GITHUB_URL/install.sh)
 #============================================================
 
 red='\033[0;31m'
@@ -18,8 +18,6 @@ XRAYR_DIR="/usr/local/XrayR"
 XRAYR_BIN="$XRAYR_DIR/XrayR"
 XRAYR_CFG="/etc/XrayR/config.yml"
 XRAYR_SVC="/etc/systemd/system/XrayR.service"
-
-CONFIG_DOWNLOAD_URL="https://cdn.jsdelivr.net/gh/Chung-VPN/XrayR-ChungNG@main/config.yml"
 
 #============================================================
 #  TIỆN ÍCH
@@ -93,7 +91,7 @@ install_deps() {
 }
 
 #============================================================
-#  TẤT FIREWALL
+#  TẮT FIREWALL
 #============================================================
 disable_fw() {
     echo -e "${blue}[*] Tắt firewall...${plain}"
@@ -110,7 +108,7 @@ disable_fw() {
 }
 
 #============================================================
-#  TẢI XrayR — DÙNG LINK CỐ ĐỊNH /releases/latest/download/
+#  TẢI XrayR — LINK CỐ ĐỊNH + 3 MIRROR
 #============================================================
 install_binary() {
     echo -e "${blue}[*] Tải XrayR phiên bản mới nhất...${plain}"
@@ -119,10 +117,10 @@ install_binary() {
     mkdir -p "$XRAYR_DIR"
     local zip_path="$XRAYR_DIR/XrayR-linux.zip"
 
-    # Link GitHub cố định — luôn là phiên bản mới nhất
+    # Link cố định — luôn là phiên bản mới nhất
     local url="https://github.com/XrayR-project/XrayR/releases/latest/download/XrayR-linux-${arch}.zip"
 
-    # Danh sách mirror (GitHub → jsdelivr CDN fallback)
+    # Danh sách mirror
     local mirrors=(
         "$url"
         "https://cdn.jsdelivr.net/gh/XrayR-project/XrayR@latest/releases/XrayR-linux-${arch}.zip"
@@ -132,14 +130,14 @@ install_binary() {
     local downloaded=false
 
     for mirror in "${mirrors[@]}"; do
-        echo -e "${blue}[*] Đang tải từ: ${mirror##*/}${plain}"
+        echo -e "${blue}[*] Đang tải...${plain}"
 
         # Thử 3 lần cho mỗi mirror
         for attempt in 1 2 3; do
             if curl -fSL --connect-timeout 15 --max-time 600 \
                     --progress-bar -o "$zip_path" "$mirror" 2>&1; then
 
-                # Kiểm tra file có hợp lệ không
+                # Kiểm tra file hợp lệ
                 if [[ -s "$zip_path" ]] && file "$zip_path" 2>/dev/null | grep -qi "zip\|archive"; then
                     echo -e "${green}[✓] Tải thành công (lần thử $attempt)${plain}"
                     downloaded=true
@@ -185,30 +183,18 @@ install_binary() {
 
     chmod +x "$XRAYR_BIN"
     echo -e "${green}[✓] Cài xong: $XRAYR_BIN${plain}"
-}
 
-#============================================================
-#  TẢI config.yml
-#============================================================
-download_config() {
-    echo -e "${blue}[*] Tải config.yml...${plain}"
+    # Copy config.yml từ file mẫu trong zip sang /etc/XrayR/
+    echo -e "${blue}[*] Tạo thư mục cấu hình...${plain}"
     mkdir -p /etc/XrayR
 
-    # Thử curl trước
-    if curl -fsSL --connect-timeout 10 -o "$XRAYR_CFG" "$CONFIG_DOWNLOAD_URL" 2>/dev/null; then
-        :
-    # Fallback wget
-    elif wget -q --no-check-certificate -O "$XRAYR_CFG" "$CONFIG_DOWNLOAD_URL" 2>/dev/null; then
-        :
+    if [[ -f "$XRAYR_DIR/config.yml" ]]; then
+        cp "$XRAYR_DIR/config.yml" "$XRAYR_CFG"
+        echo -e "${green}[✓] Đã copy config.yml mẫu${plain}"
+    else
+        echo -e "${yellow}[!] Không tìm thấy config.yml mẫu, tạo file trống${plain}"
+        touch "$XRAYR_CFG"
     fi
-
-    if [[ ! -s "$XRAYR_CFG" ]]; then
-        echo -e "${red}[✗] Tải config.yml thất bại!${plain}"
-        echo -e "${yellow}    URL: $CONFIG_DOWNLOAD_URL${plain}"
-        echo -e "${yellow}    → Kiểm tra YOUR_USERNAME / YOUR_REPO trong install.sh${plain}"
-        return 1
-    fi
-    echo -e "${green}[✓] config.yml đã tải${plain}"
 }
 
 #============================================================
@@ -363,6 +349,52 @@ patch_config() {
     echo ""
     echo -e "${blue}[*] Ghi cấu hình vào config.yml...${plain}"
 
+    # Nếu file rỗng hoặc không có cấu trúc đúng, tạo template cơ bản
+    if [[ ! -s "$XRAYR_CFG" ]] || ! grep -q "ApiHost" "$XRAYR_CFG" 2>/dev/null; then
+        echo -e "${yellow}[!] Tạo config.yml từ template cơ bản...${plain}"
+        cat > "$XRAYR_CFG" << 'CONFIGTEMPLATE'
+Log:
+  Level: warning
+  AccessPath:
+  ErrorPath:
+
+Nodes:
+  - PanelType: "NewV2board"
+    ApiConfig:
+      ApiHost: "YOUR_PANEL_URL"
+      ApiKey: "YOUR_API_KEY"
+      NodeID: 1
+      NodeType: V2ray
+      Timeout: 30
+      EnableVless: false
+      VlessFlow: "xtls-rprx-vision"
+      SpeedLimit: 0
+      DeviceLimit: 0
+    ControllerConfig:
+      ListenIP: 0.0.0.0
+      SendIP: 0.0.0.0
+      UpdatePeriodic: 60
+      EnableDNS: false
+      DNSType: AsIs
+      EnableProxyProtocol: false
+      GlobalDeviceLimitConfig:
+        Enable: false
+        RedisNetwork: tcp
+        RedisAddr: 127.0.0.1:6379
+        RedisUsername:
+        RedisPassword:
+        RedisDB: 0
+        Timeout: 5
+        Expiry: 60
+      CertConfig:
+        CertMode: none
+        CertDomain: ""
+        CertFile:
+        KeyFile:
+CONFIGTEMPLATE
+    fi
+
+    # Patch các giá trị
     sed -i -E 's|^( +)ApiHost:.*$|      ApiHost: "'"$api_host"'"|' "$XRAYR_CFG"
     sed -i -E 's|^( +)ApiKey:.*$|      ApiKey: "'"$api_key"'"|'   "$XRAYR_CFG"
     sed -i -E 's/^( +)NodeID:.*$/      NodeID: '"$node_id"'/'       "$XRAYR_CFG"
@@ -428,7 +460,6 @@ do_install() {
     install_deps
     disable_fw
     install_binary       || { wait_key ; return ; }
-    download_config      || { wait_key ; return ; }
 
     input_api_host
     input_api_key
