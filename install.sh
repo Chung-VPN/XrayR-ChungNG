@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[1;33m'
@@ -76,13 +77,32 @@ wait_key() {
 #  CÀI DEPENDENCIES
 #============================================================
 install_deps() {
-    echo -e "${blue}[●] Cài các gói cần thiết...${plain}"
+    echo -e "${blue}[●] Kiểm tra các gói cần thiết...${plain}"
+    
+    local missing_pkgs=()
+    
+    # Check từng package
+    command -v curl &>/dev/null  || missing_pkgs+=("curl")
+    command -v wget &>/dev/null  || missing_pkgs+=("wget")
+    command -v unzip &>/dev/null || missing_pkgs+=("unzip")
+    
+    # Nếu tất cả đã có rồi → skip
+    if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        echo -e "${green}[✓] Tất cả đã có sẵn${plain}"
+        return 0
+    fi
+    
+    # Cài những gói còn thiếu
+    echo -e "${yellow}[!] Thiếu: ${missing_pkgs[*]}${plain}"
+    echo -e "${blue}[●] Đang cài...${plain}"
+    
     if [[ "$release" == "centos" ]]; then
-        yum install -y -q curl wget unzip 2>/dev/null
+        yum install -y -q "${missing_pkgs[@]}" 2>/dev/null
     else
         apt-get update -qq 2>/dev/null
-        apt-get install -y -qq curl wget unzip 2>/dev/null
+        apt-get install -y -qq "${missing_pkgs[@]}" 2>/dev/null
     fi
+    
     echo -e "${green}[✓] Xong${plain}"
 }
 
